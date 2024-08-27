@@ -3,7 +3,8 @@ import { defHttp } from '/@/utils/http/axios';
 import qs from 'qs';
 
 enum Api {
-  Base = '/tools/storage',
+  Base = '/storage',
+  List = '/storage/list'
 }
 
 export interface Storage {
@@ -21,7 +22,7 @@ export type StorageListResult = BasicPaginationResult<Storage>;
 
 export const getStorageList = (params?: BasicPageParams) =>
   defHttp.get<StorageListResult>({
-    url: Api.Base,
+    url: Api.List,
     params,
     paramsSerializer: (params) => qs.stringify(params, { arrayFormat: 'repeat' }),
   });

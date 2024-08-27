@@ -26,6 +26,11 @@ export function getIp(request: FastifyRequest | IncomingMessage) {
 }
 
 export async function getIpAddress(ip: string) {
+  if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(ip)) return Promise.resolve('局域网')
+  if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(ip)) return Promise.resolve('局域网')
+  if (/^172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3}$/.test(ip)) return Promise.resolve('局域网')
+  if (/^127\.\d{1,3}$/.test(ip)) return Promise.resolve('本地')
+  if (!ip || ip === '127.0.0.1') return Promise.resolve('本地')
   const { data } = await axios.get(
     `https://api.kuizuo.cn/api/ip-location?ip=${ip}&type=json`,
   )
