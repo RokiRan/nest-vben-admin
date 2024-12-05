@@ -20,6 +20,7 @@ import { TasksModule } from './modules/tasks/tasks.module'
 import { TodoModule } from './modules/todo/todo.module'
 import { ToolsModule } from './modules/tools/tools.module'
 import { DatabaseModule } from './shared/database/database.module'
+import { FootballModule } from './modules/football/football.module'
 
 import { SocketModule } from './socket/socket.module'
 
@@ -45,6 +46,7 @@ import { SocketModule } from './socket/socket.module'
     // end biz
 
     TodoModule,
+    FootballModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

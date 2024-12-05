@@ -294,32 +294,44 @@ export class TaskService implements OnModuleInit {
     exec: string,
   ): Promise<void | never> {
     try {
+      this.logger.debug(`检查任务: nameOrInstance = ${nameOrInstance}, exec = ${exec}`);
+      
       let service: any
-      if (typeof nameOrInstance === 'string')
+      if (typeof nameOrInstance === 'string') {
+        // this.logger.debug(`通过名称获取服务: ${nameOrInstance}`);
         service = await this.moduleRef.get(nameOrInstance, { strict: false })
-      else
+      }
+      else {
+        // this.logger.debug(`直接使用服务实例`);
         service = nameOrInstance
+      }
+
+      // this.logger.debug(`获取到的服务:`, service);
+      // this.logger.debug(`服务上的方法:`, Object.keys(service || {}));
 
       // 所执行的任务不存在
-      if (!service || !(exec in service))
-        throw new NotFoundException('任务不存在')
+      if (!service || !(exec in service)) {
+        // this.logger.error(`任务不存在: service=${!!service}, exec=${exec}, exec in service=${exec in (service || {})}`);
+        throw new BadRequestException('任务不存在')
+      }
 
       // 检测是否有Mission注解
       const hasMission = this.reflector.get<boolean>(
         MISSION_DECORATOR_KEY,
         service.constructor,
       )
+
       // 如果没有，则抛出错误
       if (!hasMission)
         throw new BusinessException(ErrorEnum.INSECURE_MISSION)
     }
     catch (e) {
       if (e instanceof UnknownElementException) {
-        // 任务不存在
-        throw new NotFoundException('任务不存在')
+        // this.logger.error(`UnknownElementException: ${e.message}`);
+        throw new BadRequestException('任务不存在')
       }
       else {
-        // 其余错误则不处理，继续抛出
+        this.logger.error(`其他错误:`, e);
         throw e
       }
     }

@@ -7,6 +7,11 @@
 
 <p align="center">一款简单高效的前后端分离的权限管理系统。</p>
 
+# 1. 生成迁移文件
+pnpm typeorm migration:generate ./src/migrations/CreateFootballTables
+
+# 2. 运行迁移
+pnpm typeorm migration:run
 
 > [!Warning]
 > 该项目将不再维护，后续使用 Prisma 替换 Typeorm ，并从 Vben 迁移至 Ant Design Pro。

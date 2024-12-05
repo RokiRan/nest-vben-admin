@@ -17,7 +17,7 @@ export const columns: BasicColumn[] = [
   {
     title: '任务名称',
     dataIndex: ['task', 'name'],
-    width: 140,
+    width: 190,
   },
   {
     title: '异常信息',
