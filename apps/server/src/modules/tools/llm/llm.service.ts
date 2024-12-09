@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { HttpException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 import * as fs from 'fs';
@@ -71,12 +71,16 @@ export class LLMService {
     return this.chat(messages, options);
   }
 
-  async askWithPromptAndFile(prompt: string, file: string, options?: { model?: string; temperature?: number; maxTokens?: number }) {
+  async askWithPromptAndFile(prompt: string, file: string, options: { model?: string; temperature?: number; maxTokens?: number } = {}) {
     const messages: Array<OpenAI.Chat.ChatCompletionMessageParam> = [];
-    // const file_object = await this.openai.files.create({
-    //     file: fs.createReadStream(file), 
-    //     purpose: FilePurpose.ASSISTANT
-    // })
+    // 存放文件的路径是 /app/public
+    const file_path =  process.cwd() + '/public/upload/' + file
+    const file_object = await this.openai.files.create({
+        file: fs.createReadStream(file_path), 
+        // @ts-ignore
+        purpose: 'file-extract'
+    })
+    const file_content = await (await this.openai.files.content(file_object.id)).text()
     messages.push({
       role: 'user',
       content: prompt,
@@ -84,9 +88,23 @@ export class LLMService {
 
     messages.push({
       role: 'user',
-      content: `文件内容:${file}`,
+      content: file_content,
     });
 
-    return this.chat(messages, options);
+    const completion = await this.openai.chat.completions.create({
+      model: "moonshot-v1-32k",         
+      messages: messages,
+      temperature: 0.3,
+      ...options,
+    });
+    this.logger.log('本次消耗的token:', completion.usage.total_tokens)
+    this.logger.debug(completion.choices[0].message.content)
+    try {
+      const result = completion.choices[0].message.content;
+      return JSON.parse(result);
+    } catch (error) {
+      this.logger.error('Error calling OpenAI API:', error);
+      throw new Error('Error calling OpenAI API');
+    }
   }
 }

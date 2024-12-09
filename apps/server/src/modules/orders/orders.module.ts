@@ -1,9 +1,10 @@
 import { Module } from '@nestjs/common'
-
 import { OrdersService } from './orders.service'
 import { OrdersController } from './orders.controller'
+import { LLMModule } from '../tools/llm'
 
 @Module({
+  imports: [LLMModule],
   controllers: [OrdersController],
   providers: [OrdersService],
 })

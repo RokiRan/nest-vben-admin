@@ -1,7 +1,7 @@
 import { Column, Entity, ManyToOne, JoinColumn, BaseEntity, PrimaryColumn } from 'typeorm';
 import { League } from './league.entity';
 
-@Entity()
+@Entity('match')
 export class Match extends BaseEntity {
   @PrimaryColumn({ comment: '对阵编号' })
   taxDateNo: string;
@@ -80,6 +80,21 @@ export class Match extends BaseEntity {
 
   @Column({ nullable: true })
   updateTime: string;
+
+  @Column({ comment: '球探网对阵ID', nullable: true })
+  QtVsId: string;
+
+  @Column({ comment: '球探网主队名称', length: 100, nullable: true })
+  homeTeamQt: string;
+
+  @Column({ comment: '球探网客队ID', length: 30, nullable: true })
+  homeTeamQtId: string;
+
+  @Column({ comment: '球探网客队名称', length: 100, nullable: true })
+  awayTeamQt: string;
+
+  @Column({ comment: '球探网客队ID', length: 30, nullable: true })
+  awayTeamQtId: string;
 
   @ManyToOne(() => League)
   @JoinColumn({ name: 'leagueId' })

@@ -1,14 +1,11 @@
 import { ClassSerializerInterceptor, Module } from '@nestjs/common'
-
 import { ConfigModule } from '@nestjs/config'
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core'
-
 import * as config from '@server/config'
 import { SharedModule } from '@server/shared/shared.module'
-
 import { AllExceptionsFilter } from './common/filters/any-exception.filter'
-
 import { IdempotenceInterceptor } from './common/interceptors/idempotence.interceptor'
+import { Reflector } from '@nestjs/core'
 import { TimeoutInterceptor } from './common/interceptors/timeout.interceptor'
 import { TransformInterceptor } from './common/interceptors/transform.interceptor'
 import { AuthModule } from './modules/auth/auth.module'
@@ -21,7 +18,7 @@ import { TodoModule } from './modules/todo/todo.module'
 import { ToolsModule } from './modules/tools/tools.module'
 import { DatabaseModule } from './shared/database/database.module'
 import { FootballModule } from './modules/football/football.module'
-
+import { OrdersModule } from './modules/orders/orders.module'
 import { SocketModule } from './socket/socket.module'
 
 @Module({
@@ -47,13 +44,18 @@ import { SocketModule } from './socket/socket.module'
 
     TodoModule,
     FootballModule,
+    OrdersModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
 
     { provide: APP_INTERCEPTOR, useClass: ClassSerializerInterceptor },
     { provide: APP_INTERCEPTOR, useClass: TransformInterceptor },
-    { provide: APP_INTERCEPTOR, useFactory: () => new TimeoutInterceptor(15 * 1000) },
+    {
+      provide: APP_INTERCEPTOR,
+      useFactory: (reflector: Reflector) => new TimeoutInterceptor(reflector, 15000),
+      inject: [Reflector],
+    },
     { provide: APP_INTERCEPTOR, useClass: IdempotenceInterceptor },
 
     { provide: APP_GUARD, useClass: JwtAuthGuard },
