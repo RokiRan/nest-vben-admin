@@ -351,6 +351,13 @@ INSERT INTO `sys_task` (`id`, `name`, `service`, `type`, `status`, `start_time`,
 INSERT INTO `sys_task` (`id`, `name`, `service`, `type`, `status`, `start_time`, `end_time`, `limit`, `cron`, `every`, `data`, `job_opts`, `remark`, `created_at`, `updated_at`) VALUES (3, '定时清空任务日志', 'LogClearJob.clearTaskLog', 0, 0, NULL, NULL, 0, '0 0 3 ? * 1', 0, '', '{\"count\":1,\"key\":\"__default__:3:::0 0 3 ? * 1\",\"cron\":\"0 0 3 ? * 1\",\"jobId\":3}', '定时清空任务日志', '2023-11-10 00:31:44.197779', '2023-11-18 01:10:27.000000');
 INSERT INTO `sys_task` (`id`, `name`, `service`, `type`, `status`, `start_time`, `end_time`, `limit`, `cron`, `every`, `data`, `job_opts`, `remark`, `created_at`, `updated_at`) VALUES (4, '访问百度首页', 'HttpRequestJob.handle', 0, 0, NULL, NULL, 1, '* * * * * ?', NULL, '{\"url\":\"https://www.baidu.com\",\"method\":\"get\"}', NULL, '访问百度首页', '2023-11-10 00:31:44.197779', '2023-11-10 00:31:44.206935');
 INSERT INTO `sys_task` (`id`, `name`, `service`, `type`, `status`, `start_time`, `end_time`, `limit`, `cron`, `every`, `data`, `job_opts`, `remark`, `created_at`, `updated_at`) VALUES (5, '发送邮箱', 'EmailJob.send', 0, 0, NULL, NULL, -1, '0 0 0 1 * ?', NULL, '{\"subject\":\"这是标题\",\"to\":\"zeyu57@163.com\",\"content\":\"这是正文\"}', NULL, '每月发送邮箱', '2023-11-10 00:31:44.197779', '2023-11-10 00:31:44.206935');
+INSERT INTO `sys_task` (`id`, `name`, `service`, `type`, `status`, `start_time`, `end_time`, `limit`, `cron`, `every`, `data`, `job_opts`, `remark`, `created_at`, `updated_at`)
+VALUES
+	('6', '获取足球的比分', 'FootballJob.updateMatchResults', '1', '0', NULL, NULL, '-1', '* * * * *', '100000', NULL, '{\"count\":1,\"key\":\"__default__:6::100000\",\"every\":100000,\"jobId\":6}', NULL, '2024-12-05 15:12:49.821872', '2024-12-14 19:22:20.000000');
+INSERT INTO `sys_task` (`id`, `name`, `service`, `type`, `status`, `start_time`, `end_time`, `limit`, `cron`, `every`, `data`, `job_opts`, `remark`, `created_at`, `updated_at`)
+VALUES
+	('7', '获取竞彩足球的赛事', 'FootballJob.fetchMatchData', '0', '0', NULL, NULL, '-1', '*/10 9-23 * * *', '60000', NULL, '{\"count\":1,\"key\":\"__default__:7:::*/10 9-23 * * *\",\"cron\":\"*/10 9-23 * * *\",\"jobId\":7}', NULL, '2024-12-05 15:14:15.163149', '2024-12-14 19:22:17.000000');
+
 COMMIT;
 
 -- ----------------------------

@@ -6,7 +6,8 @@
     "declaration": false,
     "paths": {
       "@server/*": ["apps/server/*"],
-      "@admin/*": ["apps/admin/*"]
+      "@admin/*": ["apps/admin/*"],
+      "@portal/*": ["apps/portal-view2/*"]
     }
   }
 }

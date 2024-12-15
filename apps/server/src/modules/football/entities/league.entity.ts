@@ -4,13 +4,13 @@ import { Match } from './match.entity';
 @Entity()
 export class League extends BaseEntity {
   @PrimaryColumn({ comment: '联赛ID' })
-  leagueId: string;
+  league_id: string;
 
   @Column({ comment: '联赛名称' })
-  leagueName: string;
+  league_name: string;
 
   @Column({ comment: '联赛简称' })
-  leagueNameAbbr: string;
+  league_name_abbr: string;
 
   @OneToMany(() => Match, match => match.league)
   matches: Match[];

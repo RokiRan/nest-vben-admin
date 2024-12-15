@@ -2,9 +2,11 @@ import { Controller, Get, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { FootballService } from './football.service';
 import { UpdateMatchResultsDto } from './dto/update-match-results.dto';
+import { ApiSecurityAuth } from '@server/common/decorators/swagger.decorator';
 
 @ApiTags('Football')
 @Controller('football')
+@ApiSecurityAuth()
 export class FootballController {
   constructor(private readonly footballService: FootballService) {}
 
@@ -45,5 +47,11 @@ export class FootballController {
     @Query('endDate') endDate: Date,
   ) {
     return this.footballService.findMatchesByDateRange(startDate, endDate);
+  }
+
+  @Get('matches/today')
+  @ApiOperation({ summary: '获取今日可售比赛' })
+  findTodaySellingMatches() {
+    return this.footballService.findTodaySellingMatches();
   }
 }

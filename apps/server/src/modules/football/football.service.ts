@@ -4,7 +4,7 @@ import { Repository, Between } from 'typeorm';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import dayjs from 'dayjs';
-import { Match } from './entities/match.entity';
+import { Match, MatchStatus } from './entities/match.entity';
 import { League } from './entities/league.entity';
 import { FootballResponse, LeagueInfo, MatchInfoList, MatchResultResponse } from './interfaces/football.interface';
 import { UpdateMatchResultsDto } from './dto/update-match-results.dto';
@@ -12,12 +12,10 @@ import { UpdateMatchResultsDto } from './dto/update-match-results.dto';
 @Injectable()
 export class FootballService {
   private readonly logger = new Logger(FootballService.name);
-  private readonly MATCH_CALCULATOR_API_URL = 'https://webapi.sporttery.cn/gateway/jc/football/getMatchCalculatorV1.qry?poolCode=hhad,had&channel=c';
+  private readonly MATCH_CALCULATOR_API_URL = 'https://webapi.sporttery.cn/gateway/jc/football/getMatchCalculatorV1.qry?poolCode=&channel=c';
   private readonly RESULT_API_URL = 'https://webapi.sporttery.cn/gateway/jc/football/getMatchResultV1.qry';
-  // 球探api地址
   private readonly FOOTBALL_API_URL = `https://jc.titan007.com/xml/bf_jc.txt`;
-  // 下边这个结果来的太慢了
-  private readonly FOOTBALL_API_URL2 = `https://txt.ewin007.com/phone/schedule_0_3.txt`;
+
   constructor(
     @InjectRepository(Match)
     private readonly matchRepository: Repository<Match>,
@@ -40,10 +38,7 @@ export class FootballService {
       this.logger.debug(`获取到 ${data.value.leagueList.length} 个联赛数据`);
       this.logger.debug(`获取到 ${data.value.matchInfoList.length} 个比赛日数据`);
 
-      // 保存联赛信息
       await this.saveLeagues(data.value.leagueList);
-
-      // 保存比赛信息
       await this.saveMatches(data.value.matchInfoList);
       await this.fetchAndSaveDataWin007();
       return true;
@@ -53,11 +48,100 @@ export class FootballService {
     }
   }
 
+  private async saveLeagues(leagues: LeagueInfo[]) {
+    try {
+      this.logger.debug('开始保存联赛数据...');
+      for (const league of leagues) {
+        const existingLeague = await this.leagueRepository.findOne({
+          where: { league_id: league.leagueId },
+        });
+
+        const leagueData = {
+          league_id: league.leagueId,
+          league_name: league.leagueName,
+          league_name_abbr: league.leagueNameAbbr,
+        };
+
+        if (existingLeague) {
+          await this.leagueRepository.update({ league_id: league.leagueId }, leagueData);
+        } else {
+          this.logger.debug(`创建联赛: ${league.leagueName}`);
+          await this.leagueRepository.save(leagueData);
+        }
+      }
+      this.logger.debug('联赛数据保存完成');
+    } catch (error) {
+      this.logger.error('Error saving leagues:', error);
+      throw error;
+    }
+  }
+
+  private async saveMatches(matchInfoList: MatchInfoList[]) {
+    try {
+      this.logger.debug('开始保存比赛数据...');
+      for (const matchInfo of matchInfoList) {
+        this.logger.debug(`处理比赛日期: ${matchInfo.businessDate}`);
+        for (const match of matchInfo.subMatchList) {
+          const tax_date_no = `${matchInfo.businessDate}_${match.matchId}`;
+
+          const existingMatch = await this.matchRepository.findOne({
+            where: { tax_date_no },
+          });
+          // TODO: 比赛状态
+          // 检查 matchStatus 是否为有效的枚举值
+          if (!Object.values(MatchStatus).includes(match.matchStatus as MatchStatus)) {
+            throw new Error(`无效的比赛状态: ${match.matchStatus}`);
+          }
+          const matchData = {
+            tax_date_no,
+            match_id: match.matchId,
+            match_date: new Date(match.matchDate),
+            match_time: match.matchTime,
+            match_num: match.matchNum,
+            match_num_str: match.matchNumStr,
+            home_team: match.homeTeamAbbName || match.homeTeamAllName,
+            home_team_abb_en_name: match.homeTeamAbbEnName,
+            home_rank: match.homeRank,
+            away_team: match.awayTeamAbbName || match.awayTeamAllName,
+            away_team_abb_en_name: match.awayTeamAbbEnName,
+            away_rank: match.awayRank,
+            goal_line: match.hhad?.goalLine || null,
+            home_odds: match.had?.h || null,
+            draw_odds: match.had?.d || null,
+            away_odds: match.had?.a || null,
+            handicap_home_odds: match.hhad?.h || null,
+            handicap_draw_odds: match.hhad?.d || null,
+            handicap_away_odds: match.hhad?.a || null,
+            match_status: match.matchStatus,
+            sell_status: match.sellStatus,
+            update_date: new Date(match.had?.updateDate || match.hhad?.updateDate),
+            update_time: match.had?.updateTime || match.hhad?.updateTime,
+            league_id: match.leagueId,
+            // 处理其他赔率
+            score_odds: JSON.stringify(match.crs),
+            half_full_odds: JSON.stringify(match.hafu),
+            total_goal_odds: JSON.stringify(match.ttg),
+          };
+
+          if (existingMatch) {
+            await this.matchRepository.update({ tax_date_no }, matchData);
+          } else {
+            this.logger.debug(`创建比赛: ${tax_date_no}`);
+            await this.matchRepository.save(matchData);
+          }
+        }
+      }
+      this.logger.debug('比赛数据保存完成');
+    } catch (error) {
+      this.logger.error('Error saving matches:', error);
+      throw error;
+    }
+  }
+
   async updateMatchResults(dto: UpdateMatchResultsDto) {
     try {
-      // 如果没有传入日期，默认查询最近3天的数据
       const endDate = dto.endDate ? dto.endDate : dayjs().format('YYYY-MM-DD');
-      const startDate = dto.startDate ? dto.startDate : dayjs().subtract(2, 'day').format('YYYY-MM-DD');
+      const startDate = dto.startDate ? dto.startDate : dayjs().subtract(3, 'day').format('YYYY-MM-DD');
 
       this.logger.debug(`开始获取比赛结果数据... ${startDate} - ${endDate}`);
       
@@ -82,125 +166,36 @@ export class FootballService {
 
       this.logger.debug(`获取到 ${data.value.matchResult.length} 个比赛结果`);
 
-      // 更新比赛结果
       for (const result of data.value.matchResult) {
-        const matchId = `${result.matchId}`;
+        const match_id = `${result.matchId}`;
         
         const matchData = {
-          matchResultStatus: result.matchResultStatus,
-          halfScore: result.sectionsNo1,
-          wholeScore: result.sectionsNo999,
-          homeOdds: result.h,
-          drawOdds: result.d,
-          awayOdds: result.a,
-          goalLine: result.goalLine,
+          match_result_status: result.matchResultStatus,
+          half_score: result.sectionsNo1,
+          whole_score: result.sectionsNo999,
+          home_odds: result.h,
+          draw_odds: result.d,
+          away_odds: result.a,
+          goal_line: result.goalLine,
+          // TODO: 比赛状态
+          match_status: MatchStatus.Done
         };
 
         const existingMatch = await this.matchRepository.findOne({
-          where: { matchId: +matchId},
+          where: { match_id: +match_id },
         });
 
         if (existingMatch) {
-          this.logger.debug(`更新比赛结果: ${matchId}`);
-          if(existingMatch.halfScore && existingMatch.wholeScore)
+          this.logger.debug(`更新比赛结果: ${match_id}`);
+          if(existingMatch.match_status === 'Done')
             continue;
-          await this.matchRepository.update({ matchId: +matchId }, matchData);
-        } else {
-          // this.logger.debug(`未找到比赛: ${matchId}`);
+          await this.matchRepository.update({ match_id: +match_id }, matchData);
         }
       }
 
       return true;
     } catch (error) {
       this.logger.error('Error updating match results:', error);
-      throw error;
-    }
-  }
-
-  private async saveLeagues(leagues: LeagueInfo[]) {
-    try {
-      this.logger.debug('开始保存联赛数据...');
-      for (const league of leagues) {
-        // this.logger.debug(`处理联赛: ${league.leagueName} (${league.leagueId})`);
-        const existingLeague = await this.leagueRepository.findOne({
-          where: { leagueId: league.leagueId },
-        });
-
-        const leagueData = {
-          leagueId: league.leagueId,
-          leagueName: league.leagueName,
-          leagueNameAbbr: league.leagueNameAbbr,
-        };
-
-        if (existingLeague) {
-          // this.logger.debug(`更新联赛: ${league.leagueName}`);
-          await this.leagueRepository.update({ leagueId: league.leagueId }, leagueData);
-        } else {
-          this.logger.debug(`创建联赛: ${league.leagueName}`);
-          await this.leagueRepository.save(leagueData);
-        }
-      }
-      this.logger.debug('联赛数据保存完成');
-    } catch (error) {
-      this.logger.error('Error saving leagues:', error);
-      throw error;
-    }
-  }
-
-  private async saveMatches(matchInfoList: MatchInfoList[]) {
-    try {
-      this.logger.debug('开始保存比赛数据...');
-      for (const matchInfo of matchInfoList) {
-        this.logger.debug(`处理比赛日期: ${matchInfo.businessDate}`);
-        for (const match of matchInfo.subMatchList) {
-          const taxDateNo = `${matchInfo.businessDate}_${match.matchId}`;
-          // this.logger.debug(`处理比赛: ${match.homeTeamAbbName} vs ${match.awayTeamAbbName} (${taxDateNo})`);
-
-          const existingMatch = await this.matchRepository.findOne({
-            where: { taxDateNo },
-          });
-
-          const matchData = {
-            taxDateNo,
-            matchId: match.matchId,
-            matchDate: new Date(match.matchDate),
-            matchTime: match.matchTime,
-            matchNum: match.matchNum,
-            matchNumStr: match.matchNumStr,
-            homeTeam: match.homeTeamAbbName || match.homeTeamAllName,
-            homeTeamAbbEnName: match.homeTeamAbbEnName,
-            homeRank: match.homeRank,
-            awayTeam: match.awayTeamAbbName || match.awayTeamAllName,
-            awayTeamAbbEnName: match.awayTeamAbbEnName,
-            awayRank: match.awayRank,
-            goalLine: match.hhad?.goalLine || null,
-            homeOdds: match.had?.h || null,
-            drawOdds: match.had?.d || null,
-            awayOdds: match.had?.a || null,
-            handicapHomeOdds: match.hhad?.h || null,
-            handicapDrawOdds: match.hhad?.d || null,
-            handicapAwayOdds: match.hhad?.a || null,
-            matchStatus: match.matchStatus,
-            sellStatus: match.sellStatus,
-            updateDate: new Date(match.had?.updateDate || match.hhad?.updateDate),
-            updateTime: match.had?.updateTime || match.hhad?.updateTime,
-            leagueId: match.leagueId,
-          };
-
-          // this.logger.debug('Match data to save:', JSON.stringify(matchData, null, 2));
-
-          if (existingMatch) {
-            // this.logger.debug(`更新比赛: ${taxDateNo} (销售状态: ${match.sellStatus === 2 ? '禁止购买' : '可购买'})`);
-            await this.matchRepository.update({ taxDateNo }, matchData);
-          } else {
-            this.logger.debug(`创建比赛: ${taxDateNo}`);
-            await this.matchRepository.save(matchData);
-          }
-        }
-      }
-      this.logger.debug('比赛数据保存完成');
-    } catch (error) {
-      this.logger.error('Error saving matches:', error);
       throw error;
     }
   }
@@ -215,20 +210,20 @@ export class FootballService {
     return this.matchRepository.find({
       relations: ['league'],
       order: {
-        matchDate: 'DESC',
-        matchTime: 'DESC',
+        match_date: 'DESC',
+        match_time: 'DESC',
       },
     });
   }
 
   // 根据联赛ID获取比赛
-  async findMatchesByLeague(leagueId: string) {
+  async findMatchesByLeague(league_id: string) {
     return this.matchRepository.find({
-      where: { leagueId },
+      where: { league_id },
       relations: ['league'],
       order: {
-        matchDate: 'DESC',
-        matchTime: 'DESC',
+        match_date: 'DESC',
+        match_time: 'DESC',
       },
     });
   }
@@ -237,18 +232,18 @@ export class FootballService {
   async findMatchesByDateRange(startDate: Date, endDate: Date) {
     return this.matchRepository.find({
       where: {
-        matchDate: Between(startDate, endDate),
+        match_date: Between(startDate, endDate),
       },
       relations: ['league'],
       order: {
-        matchDate: 'DESC',
-        matchTime: 'DESC',
+        match_date: 'DESC',
+        match_time: 'DESC',
       },
     });
   }
 
-  // 这里是另外一个平台的数据 win007 （球探）
-  async fetchAndSaveDataWin007(){
+  // 球探网数据抓取
+  async fetchAndSaveDataWin007() {
     // 我先给出demo数据
     const { data } = await firstValueFrom(
       this.httpService.get<string>(this.FOOTBALL_API_URL, { responseType: 'text', responseEncoding: 'utf-8', headers: {
@@ -303,26 +298,99 @@ export class FootballService {
       const { QtVsId, matchDate, homeTeam, awayTeam, jcWeekNo } = matchData;
       
       // 根据比赛日期和竞彩编号查找匹配的比赛
-      const where  = {
-        matchDate: matchDate.split(' ')[0], // 只取日期部分
-        matchNumStr: jcWeekNo, // 使用竞彩编号匹配
-      }
       const existingMatch = await this.matchRepository.findOne({
-        where,
+        where: {
+          match_date: matchDate.split(' ')[0], // 只取日期部分
+          match_num_str: jcWeekNo, // 使用竞彩编号匹配
+        }
       });
       if (existingMatch) {
         // 更新已存在的比赛记录
-        await this.matchRepository.update(existingMatch.taxDateNo, {
-          QtVsId,
-          homeTeamQt: homeTeam, // 存储球探的队伍名称
-          awayTeamQt: awayTeam,
-          homeTeamQtId: matchData.homeTeamId,
-          awayTeamQtId: matchData.awayTeamId,
+        await this.matchRepository.update(existingMatch.tax_date_no, {
+          qt_vs_id: QtVsId,
+          home_team_qt: homeTeam, // 存储球探的队伍名称
+          away_team_qt: awayTeam,
+          home_team_qt_id: matchData.homeTeamId,
+          away_team_qt_id: matchData.awayTeamId,
         });
-        this.logger.debug(`Updated match: ${existingMatch.taxDateNo}`);
+        this.logger.debug(`Updated match: ${existingMatch.tax_date_no}`);
       } else {
         this.logger.debug(`No matching match found for date ${matchDate} and matchNumStr ${jcWeekNo}`);
       }
+    }
+  }
+
+  async findTodaySellingMatches() {
+    try {
+      // 修改这里：将字符串日期转换为 Date 对象
+      const today = new Date(dayjs().format('YYYY-MM-DD'));
+      const tomorrow = new Date(dayjs().add(1, 'day').format('YYYY-MM-DD'));
+
+      this.logger.debug(`查询今日比赛: ${dayjs(today).format('YYYY-MM-DD')}`);
+
+      const matches = await this.matchRepository.find({
+        where: {
+          match_date: Between(today, tomorrow),
+          match_status: MatchStatus.Selling,
+        },
+        relations: {
+          league: true,  // 关联联赛信息
+        },
+        order: {
+          match_id: 'ASC',  // 按比赛时间升序排序
+          // match_num: 'ASC',   // 按比赛编号升序排序
+        },
+        select: {
+          // 选择需要返回的字段
+          tax_date_no: true,
+          match_id: true,
+          match_date: true,
+          match_time: true,
+          match_num: true,
+          match_num_str: true,
+          home_team: true,
+          home_team_abb_en_name: true,
+          home_rank: true,
+          away_team: true,
+          away_team_abb_en_name: true,
+          away_rank: true,
+          goal_line: true,
+          home_odds: true,
+          draw_odds: true,
+          away_odds: true,
+          handicap_home_odds: true,
+          handicap_draw_odds: true,
+          handicap_away_odds: true,
+          match_status: true,
+          sell_status: true,
+          league: {
+            // 选择需要返回的联赛字段
+            league_id: true,
+            league_name: true,
+            league_name_abbr: true,
+          },
+        },
+      });
+
+      // 对结果进行分组，按联赛分组
+      // const groupedMatches = matches.reduce((acc, match) => {
+      //   const leagueId = match.league.league_id;
+      //   if (!acc[leagueId]) {
+      //     acc[leagueId] = {
+      //       league_id: match.league.league_id,
+      //       league_name: match.league.league_name,
+      //       league_name_abbr: match.league.league_name_abbr,
+      //       matches: [],
+      //     };
+      //   }
+      //   acc[leagueId].matches.push(match);
+      //   return acc;
+      // }, {});
+
+      return Object.values(matches);
+    } catch (error) {
+      this.logger.error('Error finding today selling matches:', error);
+      throw error;
     }
   }
 }
