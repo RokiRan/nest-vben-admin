@@ -1,4 +1,4 @@
-import { IsArray, IsInt, IsNotEmpty, IsNumber, IsString, Min, ValidateNested } from 'class-validator';
+import { IsArray, IsInt, IsNotEmpty, IsNumber, IsString, Matches, Min, ValidateNested } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 
 export class CreateFootballOrderDetailDto {
@@ -32,9 +32,13 @@ export class CreateFootballOrderDto {
   // @Transform(({ value }) => value.length)
   matchCount: number;
 
+
+  // 过关类型，
   @IsNotEmpty()
   @IsString()
-  passType: string; // 过关类型，2x1 (2串1) 可能有多个，如 3,4
+  // 所有的字符串是小雨9的数字
+  @Matches(/^[1-8]+$/)
+  passType: string; 
 
   @IsNotEmpty()
   @IsString()

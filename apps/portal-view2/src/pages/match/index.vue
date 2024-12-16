@@ -41,7 +41,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { showToast } from 'vant'
-import { getTodayMatches } from '@/api/football'
+import { getTodayMatches, createBetOrder } from '@/api/football'
 import MatchList from './components/MatchList.vue'
 import BetSlipModal from './components/BetSlipModal.vue'
 
@@ -78,6 +78,13 @@ const fetchMatches = async () => {
 // 选择比赛
 const handleMatchSelect = (match, option) => {
   const index = selectedMatches.value.findIndex(m => m.match_id === match.match_id)
+  
+  // 如果是新增比赛，先检查是否超过限制
+  if (index === -1 && selectedMatches.value.length >= 8) {
+    showToast('最多只能选择8场比赛')
+    return
+  }
+
   if (index > -1) {
     // 找到已选择的选项索引
     const optionIndex = selectedMatches.value[index].options.findIndex(
@@ -106,8 +113,37 @@ const handleMatchSelect = (match, option) => {
 
 // 投注提交
 const handleBetSubmit = (betData) => {
-  // TODO: 调用投注API
-  showBetSlip.value = false
+  // 转换投注数据格式
+  const details = betData.matches.map(match => {
+    return match.options.map(option => ({
+      matchId: match.match_id,
+      bettingOptionCode: option.code,
+      odds: Number(option.odds),
+      isDan: false
+    }))
+  }).flat()
+  const orderData = {
+    details,
+    matchCount: betData.matches.length,
+    passType: betData.passTypes.map(type => type.replace(/串1/g, '')).join(''),
+    playType: betData.playType,
+    multiple: betData.multiple,
+    amount: betData.totalAmount,
+    bonus: Number(betData.maxBonus),
+    strip: betData.strip,
+  }
+
+  createBetOrder(orderData).then(res => {
+    console.log(res)
+  }).then(() => {
+    showToast('投注成功')
+    // 清理投注数据
+    selectedMatches.value = []
+  }).catch(err => {
+    showToast(err.message)
+  }).finally(() => {
+    showBetSlip.value = false
+  })
 }
 
 // 取消投注

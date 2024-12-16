@@ -40,7 +40,7 @@ export class OrdersService {
     const { details, passType, multiple, playType, strip, bonus, matchCount, amount } = createOrderDto;
 
     // 1. 验证比赛是否存在且可投注
-    const matchIds = details.map(detail => detail.matchId);
+    const matchIds = [...new Set(details.map(detail => detail.matchId))]
     this.logger.debug(`验证比赛ID: ${JSON.stringify(matchIds)}`);
     const matches = await this.matchRepo.findBy({ match_id: In(matchIds) });
     if (matches.length !== matchIds.length) {
@@ -62,7 +62,7 @@ export class OrdersService {
       throw new BadRequestException('玩法不存在');
     }
 
-    const bettingOptionCodes = details.map(detail => detail.bettingOptionCode);
+    const bettingOptionCodes = [...new Set(details.map(detail => detail.bettingOptionCode))];
     this.logger.debug(`验证投注选项代码: ${JSON.stringify(bettingOptionCodes)}`);
     const bettingOptions = await this.bettingOptionRepo.findBy({ code: In(bettingOptionCodes) });
     if (bettingOptions.length !== bettingOptionCodes.length) {
@@ -77,7 +77,7 @@ export class OrdersService {
     }, {});
 
     // 判断matchCount是否等于details的长度
-    if (matchCount !== details.length) {
+    if (matchCount !== [...new Set(details.map(d => d.matchId))].length) {
       this.logger.error('matchCount不等于details的长度');
       throw new BadRequestException('matchCount不等于details的长度');
     }
@@ -139,5 +139,16 @@ export class OrdersService {
     } finally {
       await queryRunner.release();
     }
+  }
+
+  // 更新订单详情的投注结果
+  async updateOrderDetailResult() {
+    // 1 选出状态为pending的数据
+
+    // 2 根据比赛ID和投注选项代码获取比赛数据
+
+    // 3 根据比赛数据和投注选项代码获取投注结果
+    
+    // 4 更新订单详情的投注结果
   }
 }

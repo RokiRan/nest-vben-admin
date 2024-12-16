@@ -8,6 +8,7 @@ import { Match, MatchStatus } from './entities/match.entity';
 import { League } from './entities/league.entity';
 import { FootballResponse, LeagueInfo, MatchInfoList, MatchResultResponse } from './interfaces/football.interface';
 import { UpdateMatchResultsDto } from './dto/update-match-results.dto';
+import { getOddsData } from './tool/odds.formater';
 
 @Injectable()
 export class FootballService {
@@ -92,6 +93,13 @@ export class FootballService {
           if (!Object.values(MatchStatus).includes(match.matchStatus as MatchStatus)) {
             throw new Error(`无效的比赛状态: ${match.matchStatus}`);
           }
+          // 处理其他赔率
+          const tempHadObjCrs: Record<string, string> = {};
+          getOddsData(match.crs, 'crs', tempHadObjCrs);
+          const tempHadObjTtg: Record<string, string> = {};
+          getOddsData(match.ttg, 'ttg', tempHadObjTtg);
+          const tempHadObjHafu: Record<string, string> = {};
+          getOddsData(match.hafu, 'hafu', tempHadObjHafu);
           const matchData = {
             tax_date_no,
             match_id: match.matchId,
@@ -117,10 +125,9 @@ export class FootballService {
             update_date: new Date(match.had?.updateDate || match.hhad?.updateDate),
             update_time: match.had?.updateTime || match.hhad?.updateTime,
             league_id: match.leagueId,
-            // 处理其他赔率
-            score_odds: JSON.stringify(match.crs),
-            half_full_odds: JSON.stringify(match.hafu),
-            total_goal_odds: JSON.stringify(match.ttg),
+            score_odds: JSON.stringify(tempHadObjCrs),
+            half_full_odds: JSON.stringify(tempHadObjHafu),
+            total_goal_odds: JSON.stringify(tempHadObjTtg),
           };
 
           if (existingMatch) {
@@ -369,6 +376,9 @@ export class FootballService {
             league_name: true,
             league_name_abbr: true,
           },
+          score_odds: true,
+          half_full_odds: true,
+          total_goal_odds: true,
         },
       });
 
