@@ -207,25 +207,59 @@ const minBonus = computed(() => {
 })
 
 const maxBonus = computed(() => {
-  if (!selectedPassTypes.value.length || !props.selectedMatches.length) return '0'
+  if (!selectedPassTypes.value.length || !displayMatches.value.length) return '0';
 
-  let maxOdds = 0
-  selectedPassTypes.value.forEach(type => {
-    const passCount = parseInt(type)
-    if (passCount > props.selectedMatches.length) return
+  // 1. 从 displayMatches 中提取每场比赛的最高赔率
+  const maxOddsByMatch = displayMatches.value.reduce((acc, match) => {
+    // 获取该场比赛中的最高赔率
+    const maxOdds = Math.max(...match.options.map(opt => parseFloat(opt.odds)));
+    acc[match.match_id] = maxOdds;
+    return acc;
+  }, {} as Record<number, number>);
 
-    // 使用 displayMatches 中的赔率数据
-    const matchOdds = displayMatches.value.map(match => 
-      Math.max(...match.options.map(opt => parseFloat(opt.odds)))
-    ).sort((a, b) => b - a)
+  // 获取所有比赛的最高赔率数组
+  const maxOddsArray = Object.values(maxOddsByMatch);
+  const matchCount = maxOddsArray.length;
 
-    // 取前 passCount 个最大赔率相乘
-    const maxPassOdds = matchOdds.slice(0, passCount).reduce((acc, odds) => acc * odds, 1)
-    maxOdds = Math.max(maxOdds, maxPassOdds)
-  })
+  // 2. 计算每种串关方式的最高奖金
+  return selectedPassTypes.value.reduce((totalBonus, passType) => {
+    // 获取串关数字，例如 "2串1" 中的 2
+    const n = parseInt(passType);
+    
+    // 如果串关数大于比赛数，跳过
+    if (n > matchCount) return totalBonus;
 
-  return (maxOdds * 2 * multiple.value).toFixed(2)
-})
+    // 计算组合数
+    const combinations = getCombinations(maxOddsArray, n);
+    
+    // 计算每种组合的奖金并求和
+    const passTypeBonus = combinations.reduce((sum, odds) => {
+      // 计算单个组合的奖金
+      const combinationBonus = odds.reduce((product, odd) => product * odd, 1) 
+        * 2 // 单注金额
+        * multiple.value;
+      return sum + combinationBonus;
+    }, 0);
+
+    return totalBonus + passTypeBonus;
+  }, 0).toFixed(2);
+});
+
+// 辅助函数：计算数组的所有组合
+function getCombinations(arr: number[], n: number): number[][] {
+  if (n === 1) return arr.map(item => [item]);
+  
+  const result: number[][] = [];
+  
+  for (let i = 0; i <= arr.length - n; i++) {
+    const subCombinations = getCombinations(arr.slice(i + 1), n - 1);
+    subCombinations.forEach(subComb => {
+      result.push([arr[i], ...subComb]);
+    });
+  }
+  
+  return result;
+}
 
 // 方法
 const clearAll = () => {
@@ -273,7 +307,7 @@ const handleSubmit = () => {
   }
 
   const betData = {
-    matches: displayMatches.value, // 使用带有本地赔率的数据
+    matches: displayMatches.value, // 使用带本地赔率的数据
     passTypes: selectedPassTypes.value,
     playType: 'HHGG',
     multiple: multiple.value,
