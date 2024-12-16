@@ -1,10 +1,15 @@
-import { Controller, Get, Post, Query, Body } from '@nestjs/common'
+import { Controller, Get, Post, Query, Body, Param } from '@nestjs/common'
 import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger'
 import { OrdersService } from './orders.service'
 import { ApiSecurityAuth } from '@server/common/decorators/swagger.decorator'
-import { Timeout } from '@server/common/decorators/timeout.decorator'
+import { ApiResult } from '@server/common/decorators/api-result.decorator'
+import { Pagination } from '@server/helper/paginate/pagination'
+import { FootballOrder } from '../football/entities/football-order.entity'
+import { OrderListQueryDto } from './dto/order-list-query.dto'
+import { Timeout } from '@nestjs/schedule'
 import { CreateFootballOrderDto } from './dto/create-football-order.dto'
-import { AuthUser } from '@server/modules/auth/decorators/auth-user.decorator'
+import { AuthUser } from '../auth/decorators/auth-user.decorator'
+
 
 @ApiSecurityAuth()
 @ApiTags('orders')
@@ -13,8 +18,16 @@ export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
   @Get()
-  getOrders() {
-    return 'get orders'
+  @ApiOperation({ summary: '获取订单列表' })
+  @ApiResult({ type: [FootballOrder], isPage: true })
+  async getOrders(@Query() query: OrderListQueryDto): Promise<Pagination<FootballOrder>> {
+    return this.ordersService.getOrders(query);
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: '获取订单详情' })
+  async getOrderDetail(@Param('id') id: string) {
+    return this.ordersService.getOrderDetail(id);
   }
 
   @Post('ocr')

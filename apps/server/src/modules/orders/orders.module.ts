@@ -8,6 +8,15 @@ import { Match } from '../football/entities/match.entity';
 import { FootballPlayType } from '../football/entities/football-play-type.entity';
 import { FootballBettingOption } from '../football/entities/football-betting-option.entity';
 import { LLMModule } from '../tools/llm'
+import { OrdersJob } from '../tasks/jobs/orders.job';
+
+const providers = [
+  OrdersService,
+  {
+    provide: 'OrdersJob',
+    useClass: OrdersJob,
+  },
+];
 
 @Module({
   imports: [
@@ -21,6 +30,7 @@ import { LLMModule } from '../tools/llm'
     LLMModule,
   ],
   controllers: [OrdersController],
-  providers: [OrdersService],
+  providers: [...providers],
+  exports: [TypeOrmModule, ...providers],
 })
 export class OrdersModule {}

@@ -3,6 +3,7 @@ import { DynamicModule, ExistingProvider, Module } from '@nestjs/common'
 import { LogModule } from '@server/modules/system/log/log.module'
 import { SystemModule } from '@server/modules/system/system.module'
 import { FootballModule } from '@server/modules/football/football.module'
+import { OrdersModule } from '@server/modules/orders/orders.module'
 
 import { EmailJob } from './jobs/email.job'
 import { HttpRequestJob } from './jobs/http-request.job'
@@ -45,7 +46,7 @@ export class TasksModule {
     return {
       global: true,
       module: TasksModule,
-      imports: [SystemModule, LogModule, FootballModule],
+      imports: [SystemModule, LogModule, FootballModule, OrdersModule],
       providers: [...jobProviders, ...aliasProviders],
       exports: [...jobProviders, ...aliasProviders],
     }
