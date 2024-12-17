@@ -6,7 +6,7 @@ import { firstValueFrom } from 'rxjs';
 import dayjs from 'dayjs';
 import { Match, MatchStatus } from './entities/match.entity';
 import { League } from './entities/league.entity';
-import { FootballResponse, LeagueInfo, MatchInfoList, MatchResultResponse } from './interfaces/football.interface';
+import { FootballResponse, LeagueInfo, MatchInfoList, MatchResultResponse, PoolList } from './interfaces/football.interface';
 import { UpdateMatchResultsDto } from './dto/update-match-results.dto';
 import { getOddsData } from './tool/odds.formater';
 
@@ -34,6 +34,11 @@ export class FootballService {
 
       if (!data.success) {
         throw new Error('Failed to fetch football data');
+      }
+
+      if(!data.value.leagueList || !data.value.matchInfoList) {
+        this.logger.log('暂无数据');
+        return true;
       }
 
       this.logger.debug(`获取到 ${data.value.leagueList.length} 个联赛数据`);
@@ -100,6 +105,18 @@ export class FootballService {
           getOddsData(match.ttg, 'ttg', tempHadObjTtg);
           const tempHadObjHafu: Record<string, string> = {};
           getOddsData(match.hafu, 'hafu', tempHadObjHafu);
+
+          // 判断是否有单关
+          const singleResult = {
+            HAD: undefined,
+            HHAD: undefined,
+          }
+
+          for(const item of match.poolList) {
+           const key = item.poolCode;
+           singleResult[key] = item.single;
+          }
+
           const matchData = {
             tax_date_no,
             match_id: match.matchId,
@@ -125,6 +142,8 @@ export class FootballService {
             update_date: new Date(match.had?.updateDate || match.hhad?.updateDate),
             update_time: match.had?.updateTime || match.hhad?.updateTime,
             league_id: match.leagueId,
+            is_single_no_handicap: singleResult.HHAD,
+            is_single_handicap: singleResult.HAD,
             score_odds: JSON.stringify(tempHadObjCrs),
             half_full_odds: JSON.stringify(tempHadObjHafu),
             total_goal_odds: JSON.stringify(tempHadObjTtg),
@@ -331,21 +350,20 @@ export class FootballService {
     try {
       // 修改这里：将字符串日期转换为 Date 对象
       const today = new Date(dayjs().format('YYYY-MM-DD'));
-      const tomorrow = new Date(dayjs().add(1, 'day').format('YYYY-MM-DD'));
+      const tomorrow = new Date(dayjs().add(10, 'day').format('YYYY-MM-DD'));
 
       this.logger.debug(`查询今日比赛: ${dayjs(today).format('YYYY-MM-DD')}`);
 
       const matches = await this.matchRepository.find({
         where: {
           match_date: Between(today, tomorrow),
-          match_status: MatchStatus.Selling,
+          // match_status: MatchStatus.Selling, // TEST 暂时不限制，为了开发方便
         },
         relations: {
           league: true,  // 关联联赛信息
         },
         order: {
           match_id: 'ASC',  // 按比赛时间升序排序
-          // match_num: 'ASC',   // 按比赛编号升序排序
         },
         select: {
           // 选择需要返回的字段
@@ -370,6 +388,8 @@ export class FootballService {
           handicap_away_odds: true,
           match_status: true,
           sell_status: true,
+          is_single_no_handicap: true,
+          is_single_handicap: true,
           league: {
             // 选择需要返回的联赛字段
             league_id: true,
@@ -381,21 +401,6 @@ export class FootballService {
           total_goal_odds: true,
         },
       });
-
-      // 对结果进行分组，按联赛分组
-      // const groupedMatches = matches.reduce((acc, match) => {
-      //   const leagueId = match.league.league_id;
-      //   if (!acc[leagueId]) {
-      //     acc[leagueId] = {
-      //       league_id: match.league.league_id,
-      //       league_name: match.league.league_name,
-      //       league_name_abbr: match.league.league_name_abbr,
-      //       matches: [],
-      //     };
-      //   }
-      //   acc[leagueId].matches.push(match);
-      //   return acc;
-      // }, {});
 
       return Object.values(matches);
     } catch (error) {

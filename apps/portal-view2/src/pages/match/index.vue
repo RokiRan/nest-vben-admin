@@ -33,6 +33,7 @@
     <bet-slip-modal
       v-model:show="showBetSlip"
       :selected-matches="selectedMatches"
+      @update-dan="handleUpdateDan"
       @submit="handleBetSubmit"
       @cancel="handleBetCancel" />
   </div>
@@ -60,7 +61,7 @@ const playType = ref('HHGG')
 
 // 比赛数据
 const matches = ref([])
-const selectedMatches = ref([])
+const selectedMatches = ref<Array<any>>([])
 
 // 投注单控制
 const showBetSlip = ref(false)
@@ -119,7 +120,7 @@ const handleBetSubmit = (betData) => {
       matchId: match.match_id,
       bettingOptionCode: option.code,
       odds: Number(option.odds),
-      isDan: false
+      isDan: match.isDan
     }))
   }).flat()
   const orderData = {
@@ -149,6 +150,14 @@ const handleBetSubmit = (betData) => {
 // 取消投注
 const handleBetCancel = () => {
   showBetSlip.value = false
+}
+
+// 处理胆码更新
+const handleUpdateDan = (matchId: number, isDan: boolean) => {
+  const match = selectedMatches.value.find(m => m.match_id === matchId);
+  if (match) {
+    match.isDan = isDan;
+  }
 }
 
 onMounted(() => {

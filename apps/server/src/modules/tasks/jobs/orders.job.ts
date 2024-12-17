@@ -25,4 +25,18 @@ export class OrdersJob {
       this.logger.error('更新待开奖的投注结果失败:', error);
     }
   }
+
+  /**
+   * 更新订单的价值状态
+   * 配置为每小时执行一次：0 * * * *
+   */
+  async updateOrderValueStatus(): Promise<void> {
+    try {
+      this.logger.log('开始更新订单的价值状态...');
+      await this.ordersService.updateOrderValueStatus();
+      this.logger.log('订单的价值状态更新完成');
+    } catch (error) {
+      this.logger.error('更新订单的价值状态失败:', error);
+    }
+  }
 } 

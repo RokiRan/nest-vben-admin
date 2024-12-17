@@ -19,10 +19,24 @@ export interface OrderInfo {
   create_time: string;
 }
 
-export function getOrders(params: BasicPageParams) {
+export interface OrderListParams extends BasicPageParams {
+  userId?: number;
+  startTime?: string;
+  endTime?: string;
+  valueStatus?: string;
+}
+
+export function getOrders(params: OrderListParams) {
   return defHttp.get<BasicFetchResult<OrderInfo>>({ 
     url: Api.OrderList, 
-    params 
+    params: {
+      ...params,
+      // 处理时间范围
+      ...(params.time && {
+        startTime: params.time[0],
+        endTime: params.time[1],
+      }),
+    } 
   });
 }
 

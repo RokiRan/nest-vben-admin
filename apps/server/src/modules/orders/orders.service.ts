@@ -1,7 +1,7 @@
 import { Injectable, BadRequestException, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, In, Between } from 'typeorm';
-import { FootballOrder } from '../football/entities/football-order.entity';
+import { FootballOrder, OrderValueStatus } from '../football/entities/football-order.entity';
 import { FootballOrderDetail, BetResult } from '../football/entities/football-order-detail.entity';
 import { CreateFootballOrderDto } from './dto/create-football-order.dto';
 import { Match, MatchStatus } from '../football/entities/match.entity';
@@ -50,11 +50,6 @@ export class OrdersService {
       this.logger.error('部分比赛不存在');
       throw new BadRequestException('部分比赛不存在');
     }
-    // 创建matchId到tax_date_no的映射
-    // const matchIdToTaxDateNo = matches.reduce((acc, match) => {
-    //   acc[match.match_id] = match.tax_date_no;
-    //   return acc;
-    // }, {});
 
     // 2. 验证玩法和投注选项是否有效
     const playTypeIds = playType;
@@ -66,11 +61,11 @@ export class OrdersService {
     }
 
     const bettingOptionCodes = [...new Set(details.map(detail => detail.bettingOptionCode))];
-    this.logger.debug(`��证投注选项代码: ${JSON.stringify(bettingOptionCodes)}`);
+    this.logger.debug(`验证投注选项代码: ${JSON.stringify(bettingOptionCodes)}`);
     const bettingOptions = await this.bettingOptionRepo.findBy({ code: In(bettingOptionCodes) });
     if (bettingOptions.length !== bettingOptionCodes.length) {
       this.logger.error('部分投注选项不存在');
-      throw new BadRequestException('部分投注选项������在');
+      throw new BadRequestException('部分投注选项不存在');
     }
 
     // 创建code到id的映射
@@ -117,8 +112,7 @@ export class OrdersService {
         orderDetail.betting_option_code = detail.bettingOptionCode;
         orderDetail.odds = detail.odds;
         orderDetail.play_type = playTypes;
-        orderDetail.is_dan = detail.isDan || false;
-        
+        orderDetail.is_dan = detail.isDan ? 1 : 0;
         // 从match中获取week_number
         const match = matches.find(m => m.match_id === detail.matchId);
         if (match) {
@@ -199,6 +193,126 @@ export class OrdersService {
       await queryRunner.release();
     }
   }
+  /**
+   * 更新订单的价值状态
+   * 按照订单内比赛的时间排序，如果已经结束的比赛中不存在中奖的选项，那么此订单就标记为无价值
+   */
+  async updateOrderValueStatus() {
+    this.logger.debug('开始更新订单价值状态');
+
+    // 1. 获取所有未检查价值状态的订单
+    const orders = await this.footballOrderRepo.find({
+      where: {
+        value_status: In([OrderValueStatus.UNCHECKED, OrderValueStatus.NO_VALUE])
+      },
+      relations: ['details']
+    });
+
+    if (!orders.length) {
+      this.logger.debug('没有需要检查价值的订单');
+      return;
+    }
+
+    // 2. 获取所有相关比赛的信息
+    const matchIds = [...new Set(orders.flatMap(order => order.details.map(detail => detail.match_id)))];
+    const matches = await this.matchRepo.findBy({ match_id: In(matchIds) });
+
+    // 3. 遍历每个订单
+    for (const order of orders) {
+      try {
+        // 按比赛ID分组订单详情
+        const detailsByMatch = order.details.reduce((acc, detail) => {
+          if (!acc[detail.match_id]) {
+            acc[detail.match_id] = [];
+          }
+          acc[detail.match_id].push(detail);
+          return acc;
+        }, {} as Record<string, FootballOrderDetail[]>);
+
+        // 获取比赛信息并按时间排序
+        const orderMatches = Object.keys(detailsByMatch).map(matchId => {
+          const match = matches.find(m => m.match_id === parseInt(matchId));
+          return {
+            match,
+            details: detailsByMatch[matchId],
+            isFinished: match?.match_status === MatchStatus.Done,
+            hasWin: detailsByMatch[matchId].some(detail => detail.result === BetResult.WIN)
+          };
+        }).sort((a, b) => new Date(a.match.match_date).getTime() - new Date(b.match.match_date).getTime());
+
+        // 获取订单的过关方式
+        const passTypes = order.pass_type.split('').map(Number);
+        
+        // 检查订单状态
+        let newStatus = OrderValueStatus.UNCHECKED;
+        const finishedMatches = orderMatches.filter(m => m.isFinished);
+        const unfinishedMatches = orderMatches.filter(m => !m.isFinished);
+
+        if (finishedMatches.length === orderMatches.length) {
+          // 所有比赛都结束
+          newStatus = OrderValueStatus.FINISHED;
+        } else if (finishedMatches.length === 0) {
+          // 没有比赛结束，保持未检查状态
+          continue;
+        } else {
+          // 部分比赛结束，检查是否有价值
+          let hasValue = false;
+
+          // 对每个过关方式进行检查
+          for (const passCount of passTypes) {
+            // 获取所有可能的组合
+            const combinations = this.getCombinations(orderMatches.length, passCount);
+            
+            // 检查每个组合是否有价值
+            for (const combination of combinations) {
+              const selectedMatches = combination.map(idx => orderMatches[idx]);
+              const finishedInCombo = selectedMatches.filter(m => m.isFinished);
+              const unfinishedInCombo = selectedMatches.filter(m => !m.isFinished);
+
+              // 如果已结束的比赛都赢了，且还有未结束的比赛，那么这个组合有价值
+              if (finishedInCombo.every(m => m.hasWin) && unfinishedInCombo.length > 0) {
+                hasValue = true;
+                break;
+              }
+            }
+
+            if (hasValue) break;
+          }
+
+          newStatus = hasValue ? OrderValueStatus.VALUE : OrderValueStatus.NO_VALUE;
+        }
+
+        // 更新订单状态
+        await this.footballOrderRepo.update(order.id, {
+          value_status: newStatus
+        });
+
+      } catch (error) {
+        this.logger.error(`更新订单 ${order.id} 价值状态失败:`, error);
+      }
+    }
+  }
+
+  // 辅助方法：获取组合
+  private getCombinations(n: number, r: number): number[][] {
+    const result: number[][] = [];
+    
+    function combine(arr: number[], m: number, start: number = 0, current: number[] = []) {
+      if (current.length === m) {
+        result.push([...current]);
+        return;
+      }
+      
+      for (let i = start; i < n; i++) {
+        current.push(i);
+        combine(arr, m, i + 1, current);
+        current.pop();
+      }
+    }
+    
+    combine([...Array(n).keys()], r);
+    return result;
+  }
 
   /**
    * 检查比赛结果
@@ -264,7 +378,7 @@ export class OrdersService {
    * 获取订单列表
    */
   async getOrders(query: OrderListQueryDto): Promise<Pagination<FootballOrder>> {
-    const { page = 1, pageSize = 10, startTime, endTime, userId } = query;
+    const { page = 1, pageSize = 10, startTime, endTime, userId, valueStatus } = query;
 
     // 构建查询条件
     const where: any = {};
@@ -278,6 +392,10 @@ export class OrdersService {
 
     if (userId) {
       where.user_id = userId;
+    }
+
+    if (valueStatus) {
+      where.value_status = valueStatus;
     }
 
     // 查询订单

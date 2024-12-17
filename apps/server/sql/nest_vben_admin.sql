@@ -357,6 +357,9 @@ VALUES
 INSERT INTO `sys_task` (`id`, `name`, `service`, `type`, `status`, `start_time`, `end_time`, `limit`, `cron`, `every`, `data`, `job_opts`, `remark`, `created_at`, `updated_at`)
 VALUES
 	('7', '获取竞彩足球的赛事', 'FootballJob.fetchMatchData', '0', '0', NULL, NULL, '-1', '*/10 9-23 * * *', '60000', NULL, '{\"count\":1,\"key\":\"__default__:7:::*/10 9-23 * * *\",\"cron\":\"*/10 9-23 * * *\",\"jobId\":7}', NULL, '2024-12-05 15:14:15.163149', '2024-12-14 19:22:17.000000');
+INSERT INTO `sys_task` (`id`, `name`, `service`, `type`, `status`, `start_time`, `end_time`, `limit`, `cron`, `every`, `data`, `job_opts`, `remark`, `created_at`, `updated_at`)
+VALUES
+	('8', '订单更新投注结果', 'OrdersJob.updatePendingBetResults', '1', '1', NULL, NULL, '-1', '* 9-23 * * *', '60000', NULL, '{\"count\":1,\"key\":\"__default__:8::60000\",\"every\":60000,\"jobId\":8}', NULL, '2024-12-16 14:27:47.991097', '2024-12-17 09:40:23.000000');
 
 COMMIT;
 

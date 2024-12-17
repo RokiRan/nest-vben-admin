@@ -61,6 +61,10 @@ export class Match extends BaseEntity {
   @Column({ nullable: true, comment: '客队赔率' })
   away_odds: string;
 
+  // 不让球是否是单关
+  @Column({ nullable: true, type: 'int', comment: '不让球是否是单关' })
+  is_single_no_handicap: number;
+
   @Column({ nullable: true, comment: '让球主队赔率' })
   handicap_home_odds: string;
 
@@ -69,6 +73,10 @@ export class Match extends BaseEntity {
 
   @Column({ nullable: true, comment: '让球客队赔率' })
   handicap_away_odds: string;
+
+  // 让球是否是单关
+  @Column({ nullable: true,type: 'int',  comment: '让球是否是单关' })
+  is_single_handicap: number;
 
   //比分赔率，保存的是json字符串，格式如下：
   // {

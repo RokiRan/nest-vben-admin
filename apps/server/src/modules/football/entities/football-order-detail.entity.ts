@@ -36,8 +36,8 @@ export class FootballOrderDetail extends BaseEntity {
   @Column({ type: 'decimal', precision: 10, scale: 2, comment: '投注时赔率' })
   odds: number;
 
-  @Column({ default: false, comment: '是否设置为胆' })
-  is_dan: boolean;
+  @Column({ default: 0, type: 'tinyint', comment: '是否设置为胆' })
+  is_dan: number;
 
   @Column({ 
     type: 'enum',

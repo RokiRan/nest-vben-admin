@@ -8,6 +8,13 @@ export enum OrderStatus {
   CANCELED = 'canceled'   // 已取消
 }
 
+export enum OrderValueStatus {
+  UNCHECKED = 'uncheck',    // 未检查
+  VALUE = 'value',    // 有价值
+  NO_VALUE = 'no_value',  // 无价值
+  FINISHED = 'finished'  // 已结束
+}
+
 @Entity('football_order')
 export class FootballOrder extends BaseEntity {
   @PrimaryGeneratedColumn('uuid', { comment: '订单ID' })
@@ -49,6 +56,14 @@ export class FootballOrder extends BaseEntity {
     comment: '订单状态'
   })
   status: OrderStatus;
+
+  @Column({ 
+    type: 'enum',
+    enum: OrderValueStatus,
+    default: OrderValueStatus.UNCHECKED,
+    comment: '是否有价值'
+  })
+  value_status: OrderValueStatus;
 
   @CreateDateColumn({ comment: '创建时间' })
   create_time: Date;

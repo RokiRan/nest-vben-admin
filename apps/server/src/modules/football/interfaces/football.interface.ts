@@ -8,6 +8,35 @@ export interface FootballResponse {
   };
 }
 
+export interface PoolList {
+  allUp: number;
+  bettingAllup: number; 
+  bettingSingle: number;
+  cbtAllUp: number;
+  cbtSingle: number;
+  cbtValue: number;
+  fixedOddsgoalLine: string;
+  intAllUp: number;
+  intSingle: number;
+  intValue: number;
+  matchId: number;
+  matchNum: number;
+  poolCloseDate: string;
+  poolCloseTime: string;
+  poolCode: string;
+  poolId: number;
+  poolOddsType: string;
+  poolStatus: string;
+  sellInitialDate: string;
+  sellInitialTime: string;
+  single: number;
+  updateDate: string;
+  updateTime: string;
+  vbtAllUp: number;
+  vbtSingle: number;
+  vbtValue: number;
+}
+
 export interface MatchResultResponse {
   success: boolean;
   value: {
@@ -73,6 +102,7 @@ export interface MatchInfo {
   leagueAllName: string;
   matchStatus: MatchStatus;
   sellStatus: number;
+  poolList: PoolList[];
   had: OddsInfo;
   hhad: HandicapOddsInfo;
   crs: MatchScoreOddsInfo;

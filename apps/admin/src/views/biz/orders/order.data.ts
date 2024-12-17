@@ -89,6 +89,20 @@ export const searchFormSchema: FormSchema[] = [
     colProps: { span: 6 },
   },
   {
+    field: 'valueStatus',
+    label: '价值状态',
+    component: 'Select',
+    componentProps: {
+      options: [
+        { label: '未检查', value: 'uncheck' },
+        { label: '有价值', value: 'value' },
+        { label: '无价值', value: 'no_value' },
+        { label: '已结束', value: 'finished' },
+      ],
+    },
+    colProps: { span: 6 },
+  },
+  {
     field: 'time',
     component: 'RangePicker',
     label: '下单时间',

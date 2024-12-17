@@ -1,4 +1,4 @@
-import { IsArray, IsInt, IsNotEmpty, IsNumber, IsString, Matches, Min, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Matches, Min, ValidateNested } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 
 export class CreateFootballOrderDetailDto {
@@ -14,6 +14,8 @@ export class CreateFootballOrderDetailDto {
   @IsNumber()
   odds: number;
 
+  @IsOptional()
+  @IsBoolean()
   isDan?: boolean;
 
 }

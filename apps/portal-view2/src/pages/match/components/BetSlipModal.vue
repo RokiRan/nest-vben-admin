@@ -19,8 +19,16 @@
           <van-cell>
             <template #title>
               <div class="match-info">
-                <div class="match-teams">{{ match.home_team }} VS {{ match.away_team }}</div>
-                <div class="match-time">{{ match.match_num_str }}</div>
+                <div class="match-header">
+                  <span class="week-num">{{ match.match_num_str }}</span>
+                  <van-checkbox 
+                    :checked="match.isDan"
+                    @click="handleDanChange(match)"
+                  >
+                    胆
+                  </van-checkbox>
+                </div>
+                <div class="teams">{{ match.home_team }} VS {{ match.away_team }}</div>
               </div>
             </template>
             <template #value>
@@ -112,7 +120,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['update:show', 'submit', 'cancel'])
+const emit = defineEmits(['update:show', 'submit', 'cancel', 'updateDan'])
 
 // 过关方式选择
 const selectedPassTypes = ref<string[]>([])
@@ -209,7 +217,7 @@ const minBonus = computed(() => {
 const maxBonus = computed(() => {
   if (!selectedPassTypes.value.length || !displayMatches.value.length) return '0';
 
-  // 1. 从 displayMatches 中提取每场比赛的最高赔率
+  // 1. 从 displayMatches 中提取比赛场次中的最高赔率
   const maxOddsByMatch = displayMatches.value.reduce((acc, match) => {
     // 获取该场比赛中的最高赔率
     const maxOdds = Math.max(...match.options.map(opt => parseFloat(opt.odds)));
@@ -352,6 +360,63 @@ const displayMatches = computed(() => {
     }))
   }))
 })
+
+// 最大胆码数量（通常为过关数-1）
+const MAX_DAN_COUNT = computed(() => {
+  const maxPassNum = Math.max(...selectedPassTypes.value.map(type => parseInt(type)));
+  return Math.max(0, maxPassNum - 1);
+});
+
+// 当前胆码数量
+const currentDanCount = computed(() => {
+  return displayMatches.value.filter(match => match.isDan).length;
+});
+
+// 判断是否可以设置为胆码
+const canSetDan = (match) => {
+  // 如果当前比赛已经是胆码，则允许取消
+  if (match.isDan) return true;
+  
+  // 如果没有选择过关方式，不允许设置胆码
+  if (!selectedPassTypes.value.length) return false;
+  
+  // 如果已达到最大胆码数量，不允许继续设置
+  if (currentDanCount.value >= MAX_DAN_COUNT.value) return false;
+  
+  return true;
+};
+
+// 胆码变更处理
+const handleDanChange = (match: any) => {
+  // 如果要设置为胆码，先检查是否允许
+  const newDanValue = !match.isDan;
+  if (newDanValue && !canSetDan(match)) {
+    showToast({
+      message: `最多只能设置${MAX_DAN_COUNT.value}个胆码`,
+      type: 'warning',
+    });
+    return;
+  }
+  
+  // 通知父组件更新胆码状态
+  emit('updateDan', match.match_id, newDanValue);
+};
+
+// 修改 createOrder 方法，添加胆码信息
+const createOrder = async () => {
+  // ... 其他代码保持不变 ...
+  
+  const details = displayMatches.value.flatMap(match => 
+    match.options.map(option => ({
+      matchId: match.match_id,
+      bettingOptionCode: option.code,
+      odds: option.odds,
+      isDan: match.isDan || false, // 添加胆码标记
+    }))
+  );
+  
+  // ... 其他代码保持不变 ...
+};
 </script>
 
 <style lang="scss" scoped>
@@ -445,5 +510,23 @@ const displayMatches = computed(() => {
 .bet-slip-header {
   padding: 12px 56px;
   text-align: right;
+}
+
+.match-info {
+  .match-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+    
+    .week-num {
+      font-weight: bold;
+    }
+  }
+  
+  .teams {
+    font-size: 14px;
+    color: var(--van-text-color);
+  }
 }
 </style> 

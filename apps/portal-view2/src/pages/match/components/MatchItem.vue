@@ -18,18 +18,39 @@
                 </div>
             </div>
             <div>
-                <div class="grid grid-cols-3 gap-1">
-                    <van-button v-for="option in options" 
-                        :key="option.code" 
-                        size="small"
-                        :type="isSelected(option) ? 'primary' : 'default'" 
-                        @click="handleSelect(option)"
-                        :disabled="!option.odds"
-                        class="h-12 min-w-[60px] flex flex-col items-center justify-center p-1"
-                        >
-                        <span class="text-12">{{ option.odds ? option.name : '' }}</span>
-                        <span class="text-13 text-red-500 dark:text-red-400 mt-0.5">{{ option.odds || '-' }}</span>
-                    </van-button>
+                <div class="flex gap-2">
+                    <!-- 让球数列 -->
+                    <div class="flex gap-1 flex-col items-center justify-center">
+                        <div class="relative flex  flex-1 flex-col items-center justify-center h-12 min-w-[30px] bg-gray-50 dark:bg-dark-600 rounded">
+                            <span v-if="match.is_single_no_handicap" 
+                                  class="absolute -top-1 right-1 text-10 text-red bg-red-500 rounded-full w-4 h-4 flex items-center justify-center">
+                                单
+                            </span>
+                            <span class="text-13 text-gray-600 dark:text-gray-300">0</span>
+                        </div>
+                        <div class="relative flex flex-1  flex-col items-center justify-center h-12 min-w-[30px] bg-gray-50 dark:bg-dark-600 rounded">
+                            <span v-if="match.is_single_handicap" 
+                                  class="absolute -top-1 right-1 text-10 text-red bg-red-500 rounded-full w-4 h-4 flex items-center justify-center">
+                                单
+                            </span>
+                            <span class="text-13 text-gray-600 dark:text-gray-300">{{ match.goal_line }}</span>
+                        </div>
+                    </div>
+
+                    <!-- 胜平负按钮 -->
+                    <div class="grid grid-rows-2 grid-cols-3 gap-1">
+                        <van-button v-for="option in options" 
+                            :key="option.code" 
+                            size="small"
+                            :type="isSelected(option) ? 'primary' : 'default'" 
+                            @click="handleSelect(option)"
+                            :disabled="!option.odds"
+                            class="h-12 min-w-[60px] flex flex-col items-center justify-center p-1"
+                            >
+                            <span class="text-12">{{ option.odds ? option.name : '' }}</span>
+                            <span class="text-13 text-red-500 dark:text-red-400 mt-0.5">{{ option.odds || '-' }}</span>
+                        </van-button>
+                    </div>
                 </div>
                 <div class="text-13 text-gray-500 dark:text-gray-400 text-center mt-2" @click="handleShowAllOptions">
                     展开全部
