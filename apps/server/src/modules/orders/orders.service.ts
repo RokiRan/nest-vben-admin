@@ -125,6 +125,12 @@ export class OrdersService {
       await queryRunner.manager.save(FootballOrderDetail, orderDetails);
       await queryRunner.commitTransaction();
 
+      // 这里可以接着调用更新订单详情投注结果的方法
+      this.logger.debug(`新订单创建成功，开始更新订单详情投注结果: ${savedOrder.id}`);
+      await this.updateOrderDetailResult(savedOrder.id)
+      // 更新订单的价值状态
+      this.logger.debug(`新订单创建成功，开始更新订单价值状态: ${savedOrder.id}`);
+      await this.updateOrderValueStatus(savedOrder.id)
       return {
         orderId: savedOrder.id,
         amount,
@@ -139,14 +145,22 @@ export class OrdersService {
   }
 
   // 更新订单详情的投注结果
-  async updateOrderDetailResult() {
+  async updateOrderDetailResult(orderId: string = '') {
     this.logger.debug('开始更新待开奖的投注结果');
 
     // 1. 选出状态为pending的数据
+    const whereCondition: any = {
+      result: BetResult.PENDING
+    };
+
+    // 如果传入了orderId,只更新该订单的投注结果
+    if (orderId) {
+      whereCondition.order_id = orderId;
+      this.logger.debug(`更新指定订单 ${orderId} 的投注结果`);
+    }
+
     const pendingDetails = await this.footballOrderDetailRepo.find({
-      where: {
-        result: BetResult.PENDING
-      },
+      where: whereCondition,
       relations: ['play_type']
     });
 
@@ -186,7 +200,7 @@ export class OrdersService {
       await queryRunner.commitTransaction();
       return true;
     } catch (err) {
-      this.logger.error('更新投注结���失败', err);
+      this.logger.error('更新投注结果失败', err);
       await queryRunner.rollbackTransaction();
       throw err;
     } finally {
@@ -197,14 +211,21 @@ export class OrdersService {
    * 更新订单的价值状态
    * 按照订单内比赛的时间排序，如果已经结束的比赛中不存在中奖的选项，那么此订单就标记为无价值
    */
-  async updateOrderValueStatus() {
+  async updateOrderValueStatus(orderId: string = '') {
     this.logger.debug('开始更新订单价值状态');
+
+    const whereCondition: any = {
+      value_status: In([OrderValueStatus.UNCHECKED, OrderValueStatus.NO_VALUE, OrderValueStatus.VALUE])
+    };
+
+    if (orderId) {
+      whereCondition.id = orderId;
+      this.logger.debug(`更新指定订单 ${orderId} 的价值状态`);
+    }
 
     // 1. 获取所有未检查价值状态的订单
     const orders = await this.footballOrderRepo.find({
-      where: {
-        value_status: In([OrderValueStatus.UNCHECKED, OrderValueStatus.NO_VALUE])
-      },
+      where: whereCondition,
       relations: ['details']
     });
 
@@ -246,8 +267,7 @@ export class OrdersService {
         // 检查订单状态
         let newStatus = OrderValueStatus.UNCHECKED;
         const finishedMatches = orderMatches.filter(m => m.isFinished);
-        const unfinishedMatches = orderMatches.filter(m => !m.isFinished);
-
+        // const unfinishedMatches = orderMatches.filter(m => !m.isFinished);
         if (finishedMatches.length === orderMatches.length) {
           // 所有比赛都结束
           newStatus = OrderValueStatus.FINISHED;
@@ -262,13 +282,11 @@ export class OrdersService {
           for (const passCount of passTypes) {
             // 获取所有可能的组合
             const combinations = this.getCombinations(orderMatches.length, passCount);
-            
             // 检查每个组合是否有价值
             for (const combination of combinations) {
               const selectedMatches = combination.map(idx => orderMatches[idx]);
               const finishedInCombo = selectedMatches.filter(m => m.isFinished);
               const unfinishedInCombo = selectedMatches.filter(m => !m.isFinished);
-
               // 如果已结束的比赛都赢了，且还有未结束的比赛，那么这个组合有价值
               if (finishedInCombo.every(m => m.hasWin) && unfinishedInCombo.length > 0) {
                 hasValue = true;

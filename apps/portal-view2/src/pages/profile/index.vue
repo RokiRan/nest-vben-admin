@@ -1,11 +1,29 @@
 <script setup lang="ts">
 import router from '@/router'
 import { useUserStore } from '@/stores'
+import useAppStore from '@/stores/modules/app'
 import defaultAvatar from '@/assets/images/default-avatar.svg'
 
 const userStore = useUserStore()
+const appStore = useAppStore()
 const userInfo = computed(() => userStore.userInfo)
 const isLogin = computed(() => !!userInfo.value.id)
+
+// 主题切换相关
+const checked = ref<boolean>(isDark.value)
+
+watch(
+  () => isDark.value,
+  (newMode) => {
+    checked.value = newMode
+  },
+  { immediate: true },
+)
+
+function toggle() {
+  toggleDark()
+  appStore.switchMode(isDark.value ? 'dark' : 'light')
+}
 
 function login() {
   if (isLogin.value)
@@ -31,8 +49,12 @@ function login() {
     </VanCellGroup>
 
     <VanCellGroup :inset="true" class="!mt-16">
+      <van-cell center :title="$t('menus.darkMode')">
+        <template #right-icon>
+          <van-switch v-model="checked" size="20px" aria-label="on/off Dark Mode" @click="toggle()" />
+        </template>
+      </van-cell>
       <van-cell :title="$t('profile.settings')" icon="setting-o" is-link to="/settings" />
-      <van-cell :title="$t('profile.doc')" icon="description-o" is-link url="https://easy-temps.github.io/easy-docs/vue3-vant-mobile/" />
     </VanCellGroup>
   </div>
 </template>

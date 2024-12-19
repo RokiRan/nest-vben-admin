@@ -20,6 +20,14 @@ const biz: AppRouteModule = {
         title: '订单管理',
       },
     },
+    {
+      path: 'matches',
+      name: 'Matches',
+      component: () => import('/@/views/biz/matches/index.vue'),
+      meta: {
+        title: '比赛管理',
+      },
+    },
   ],
 };
 

@@ -9,6 +9,8 @@ import { League } from './entities/league.entity';
 import { FootballResponse, LeagueInfo, MatchInfoList, MatchResultResponse, PoolList } from './interfaces/football.interface';
 import { UpdateMatchResultsDto } from './dto/update-match-results.dto';
 import { getOddsData } from './tool/odds.formater';
+import { paginate } from '@server/helper/paginate';
+import { MatchListQueryDto } from './dto/match-list-query.dto';
 
 @Injectable()
 export class FootballService {
@@ -407,5 +409,36 @@ export class FootballService {
       this.logger.error('Error finding today selling matches:', error);
       throw error;
     }
+  }
+
+  // 获取比赛列表（管理端）
+  async findMatchList(query: MatchListQueryDto) {
+    const { page = 1, pageSize = 10, sellStatus, matchStatus, leagueId } = query;
+
+    // 构建查询条件
+    const queryBuilder = this.matchRepository
+      .createQueryBuilder('match')
+      .leftJoinAndSelect('match.league', 'league')
+      .orderBy('match.match_date', 'DESC')
+      .addOrderBy('match.match_time', 'DESC');
+
+    // 添加筛选条件
+    if (sellStatus !== undefined) {
+      queryBuilder.andWhere('match.sell_status = :sellStatus', { sellStatus });
+    }
+
+    if (matchStatus) {
+      queryBuilder.andWhere('match.match_status = :matchStatus', { matchStatus });
+    }
+
+    if (leagueId) {
+      queryBuilder.andWhere('match.league_id = :leagueId', { leagueId });
+    }
+
+    // 返回分页数据
+    return paginate(queryBuilder, {
+      page,
+      pageSize,
+    });
   }
 }

@@ -1,8 +1,16 @@
 import { Controller, Get, Post, Query } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiTags, ApiQuery } from '@nestjs/swagger';
 import { FootballService } from './football.service';
 import { UpdateMatchResultsDto } from './dto/update-match-results.dto';
 import { ApiSecurityAuth } from '@server/common/decorators/swagger.decorator';
+import { PagerDto } from '@server/common/dto/pager.dto';
+import { ApiResult } from '@server/common/decorators/api-result.decorator';
+import { Match } from './entities/match.entity';
+import { IsOptional, IsNumber, IsEnum, IsString } from 'class-validator';
+import { MatchStatus } from './entities/match.entity';
+import { MatchListQueryDto } from './dto/match-list-query.dto';
+import { Pagination } from '@server/helper/paginate/pagination';
+
 
 @ApiTags('Football')
 @Controller('football')
@@ -53,5 +61,12 @@ export class FootballController {
   @ApiOperation({ summary: '获取今日可售比赛' })
   findTodaySellingMatches() {
     return this.footballService.findTodaySellingMatches();
+  }
+
+  @Get('admin/matches')
+  @ApiOperation({ summary: '获取比赛列表（管理端）' })
+  @ApiResult({ type: [Match], isPage: true })
+  async getMatchList(@Query() query: MatchListQueryDto): Promise<Pagination<Match>> {
+    return this.footballService.findMatchList(query);
   }
 }

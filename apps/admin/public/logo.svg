@@ -1,0 +1,31 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <!-- 六边形背景 -->
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4318FF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#00B5D8;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- 六边形主体 -->
+  <path d="M64 8L108.5 34V86L64 112L19.5 86V34L64 8Z" 
+        fill="url(#grad1)" />
+  
+  <!-- 足球纹理 -->
+  <path d="M64 32L84 44V68L64 80L44 68V44L64 32Z" 
+        fill="none" 
+        stroke="white" 
+        stroke-width="2" />
+  
+  <!-- 五边形纹理 -->
+  <path d="M64 40L76 48V64L64 72L52 64V48L64 40Z" 
+        fill="none" 
+        stroke="white" 
+        stroke-width="2" />
+  
+  <!-- ¥符号 -->
+  <path d="M58 48L64 56L70 48M64 56V72" 
+        stroke="white" 
+        stroke-width="3" 
+        stroke-linecap="round" />
+</svg> 

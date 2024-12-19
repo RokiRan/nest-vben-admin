@@ -53,7 +53,7 @@
                     </div>
                 </div>
                 <div class="text-13 text-gray-500 dark:text-gray-400 text-center mt-2" @click="handleShowAllOptions">
-                    展开全部
+                    {{ selectedOptions.length > 0 ? '已选'+ selectedOptions.length + '项' : '展开全部' }}
                 </div>
             </div>
         </div>
@@ -121,7 +121,7 @@
                                     :key="score"
                                     size="small"
                                     :type="isSelected({ code: `${score}`, name: score }) ? 'primary' : 'default'"
-                                    @click="handleSelect({ code: `${score}`, name: score, odds })"
+                                    @click="handleSelect({ code: `${score}`, name: score, odds, type: 'score' })"
                                     :disabled="!odds"
                                     class="h-12"
                                 >
@@ -142,7 +142,7 @@
                                     :key="score"
                                     size="small"
                                     :type="isSelected({ code: `${score}`, name: score }) ? 'primary' : 'default'"
-                                    @click="handleSelect({ code: `${score}`, name: score, odds })"
+                                    @click="handleSelect({ code: `${score}`, name: score, odds, type: 'score' })"
                                     :disabled="!odds"
                                     class="h-12"
                                 >
@@ -163,7 +163,7 @@
                                     :key="score"
                                     size="small"
                                     :type="isSelected({ code: `${score}`, name: score }) ? 'primary' : 'default'"
-                                    @click="handleSelect({ code: `${score}`, name: score, odds })"
+                                    @click="handleSelect({ code: `${score}`, name: score, odds, type: 'score' })"
                                     :disabled="!odds"
                                     class="h-12"
                                 >
@@ -184,7 +184,7 @@
                             :key="result"
                             size="small"
                             :type="isSelected({ code: `${result}`, name: result }) ? 'primary' : 'default'"
-                            @click="handleSelect({ code: `${result}`, name: result, odds })"
+                            @click="handleSelect({ code: `${result}`, name: result, odds, type: 'half_full_time_win_lose_draw' })"
                             :disabled="!odds"
                             class="h-12"
                         >
@@ -203,7 +203,7 @@
                             :key="goals"
                             size="small"
                             :type="isSelected({ code: `${goals}`, name: goals }) ? 'primary' : 'default'"
-                            @click="handleSelect({ code: `${goals}`, name: goals, odds })"
+                            @click="handleSelect({ code: `${goals}`, name: goals, odds, type: 'total_goals' })"
                             :disabled="!odds"
                             class="h-12"
                         >
@@ -226,6 +226,7 @@ const showAllOptions = ref(false)
 interface Option {
     code: string;
     name: string;
+    type: 'win_lose_draw' | 'handicap_win_lose_draw' | 'score' | 'half_full_time_win_lose_draw' | 'total_goals';
     odds: string | number;
 }
 
@@ -248,14 +249,14 @@ const formatTime = (time) => {
 }
 
 // 投注选项
-const options = computed(() => [
-    { code: '胜', name: '胜', odds: props.match.home_odds },
-    { code: '平', name: '平', odds: props.match.draw_odds },
-    { code: '负', name: '负', odds: props.match.away_odds },
+const options = computed<Option[]>(() => [
+    { code: '胜', name: '胜', odds: props.match.home_odds, type: 'win_lose_draw' },
+    { code: '平', name: '平', odds: props.match.draw_odds, type: 'win_lose_draw' },
+    { code: '负', name: '负', odds: props.match.away_odds, type: 'win_lose_draw' },
     // 让球
-    { code: '让胜', name: '让胜', odds: props.match.handicap_home_odds },
-    { code: '让平', name: '让平', odds: props.match.handicap_draw_odds },
-    { code: '让负', name: '让负', odds: props.match.handicap_away_odds },
+    { code: '让胜', name: '让胜', odds: props.match.handicap_home_odds, type: 'handicap_win_lose_draw' },
+    { code: '让平', name: '让平', odds: props.match.handicap_draw_odds, type: 'handicap_win_lose_draw' },
+    { code: '让负', name: '让负', odds: props.match.handicap_away_odds, type: 'handicap_win_lose_draw' },
 ])
 
 // 是否已选择
@@ -412,10 +413,10 @@ const parsedHalfFullOdds = computed(() => parsedOdds.value.halfFull || {})
 const parsedTotalGoalOdds = computed(() => parsedOdds.value.totalGoal || {})
 
 // 让球胜负选项
-const handicapOptions = computed(() => [
-    { code: '让胜', name: '让胜', odds: props.match.handicap_home_odds },
-    { code: '让平', name: '让平', odds: props.match.handicap_draw_odds },
-    { code: '让负', name: '让负', odds: props.match.handicap_away_odds },
+const handicapOptions = computed<Option[]>(() => [
+    { code: '让胜', name: '让胜', odds: props.match.handicap_home_odds, type: 'handicap_win_lose_draw' },
+    { code: '让平', name: '让平', odds: props.match.handicap_draw_odds, type: 'handicap_win_lose_draw' },
+    { code: '让负', name: '让负', odds: props.match.handicap_away_odds, type: 'handicap_win_lose_draw' },
 ])
 
 onMounted(() => {

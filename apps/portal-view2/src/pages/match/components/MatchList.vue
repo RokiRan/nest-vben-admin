@@ -40,7 +40,7 @@ const handleSelect = (match, option) => {
 
 <style lang="scss" scoped>
 .match-list {
-  padding: 12px 0;
+//   padding: 12px 0;
 }
 
 :deep(.van-cell-group__title) {

@@ -325,6 +325,8 @@ const handleSubmit = () => {
     maxBonus: maxBonus.value
   }
 
+  // 投注倍数清零
+  multiple.value = 1
   emit('submit', betData)
 }
 

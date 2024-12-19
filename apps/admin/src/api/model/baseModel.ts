@@ -15,3 +15,7 @@ export interface BasicPaginationResult<T> {
   items: T[];
   meta: PaginationMeta;
 }
+export interface BasicFetchResult<T> {
+  items: T[];
+  meta: PaginationMeta;
+}

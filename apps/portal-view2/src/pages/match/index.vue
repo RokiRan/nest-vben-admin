@@ -1,7 +1,7 @@
 <template>
   <div class="min-h-90vh bg-light-100 dark:bg-dark-800 pb-50px">
     <!-- 头部选择区 -->
-    <van-sticky>
+    <!-- <van-sticky>
       <div class="header">
         <div class="bg-white dark:bg-dark-700 border-b border-gray-100 dark:border-dark-600">
           <van-dropdown-menu>
@@ -9,7 +9,7 @@
           </van-dropdown-menu>
         </div>
       </div>
-    </van-sticky>
+    </van-sticky> -->
 
     <!-- 比赛列表 -->
     <match-list 
@@ -22,7 +22,7 @@
       v-if="selectedMatches.length > 0"
       :button-text="'选好了'"
       button-color="#d81e06"
-      @submit="showBetSlip = true">
+      @submit="handleBetNextSubmit">
       <template #tip>
         <van-icon name="delete-o" style="margin-right: 4px;" />
         已选{{ selectedMatches.length }}场
@@ -74,6 +74,34 @@ const fetchMatches = async () => {
   } catch (error) {
     showToast('获取比赛数据失败')
   }
+}
+const handleBetNextSubmit = () => {
+    // 至少存在2场
+    if (selectedMatches.value.length < 2) {
+        showToast('至少选择2场比赛')
+        return
+    }
+    // 需要检查同一场内是否存在不同的玩法
+    // 先按照比赛分组，然后检查每组内是否存在不同的玩法
+    const groupedMatches = selectedMatches.value.reduce((acc, match) => {
+        acc[match.match_id] = match
+        return acc
+    }, {})
+    console.log(groupedMatches)
+    const noDifferentPlayTypeInOneMatch = Object.values(groupedMatches).every(
+        match => {
+            const options = match.options
+            if (options.length === 0 || options.length === 1) {
+                return true
+            }
+            return options.every(option => option.type === options[0].type)
+        }
+    )
+    if (!noDifferentPlayTypeInOneMatch) {
+      showToast('同一场内存在不同的玩法')
+      return
+    }
+  showBetSlip.value = true
 }
 
 // 选择比赛
@@ -159,6 +187,7 @@ const handleUpdateDan = (matchId: number, isDan: boolean) => {
     match.isDan = isDan;
   }
 }
+
 
 onMounted(() => {
   fetchMatches()

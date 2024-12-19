@@ -20,7 +20,7 @@
         <div class="detail-tables">
           <Row :gutter="16">
             <!-- 左侧比赛详情表格 -->
-            <Col :span="10">
+            <Col :span="12">
               <Table 
                 :columns="detailColumns" 
                 :dataSource="groupedDetails" 
@@ -74,7 +74,7 @@
             </Col>
 
             <!-- 右侧组合分析表格 -->
-            <Col :span="14">
+            <Col :span="12">
               <div class="combination-table">
                 <Table 
                   :columns="combinationColumns" 
@@ -303,7 +303,9 @@ const combinationDetails = computed(() => {
             unfinishedMatches.push(matchInfo);
           }
         });
-
+        if(finishedMatches.length === 0){
+            totalOdds = 0;
+        }
         combinations.push({
           finishedMatches,
           unfinishedMatches,
