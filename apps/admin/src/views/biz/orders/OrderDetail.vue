@@ -112,6 +112,21 @@
                         </span>
                       </div>
                     </template>
+
+                    <!-- 建议补单方案列 -->
+                    <template v-if="column.dataIndex === 'suggestion'">
+                      <div>
+                        <div v-for="(item, index) in record.suggestion" :key="index">
+                          <div v-for="(option, optIndex) in item" :key="optIndex">
+                            <div v-for="(option2, optIndex2) in option" :key="optIndex2">
+                              <span>{{ option2.type }}</span>
+                              <a-input v-model="option2.bet_odds" />
+                              <a-input v-model="option2.bet_amount" />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </template>
                   </template>
                 </Table>
               </div>
@@ -128,17 +143,18 @@ import { ref, watch, computed } from 'vue';
 import { Descriptions, Table, Tag, Divider, Space, Spin, Row, Col } from 'ant-design-vue';
 import { getOrderDetail } from '/@/api/biz/orders';
 import { formatToDateTime } from '/@/utils/dateUtil';
+import { getAsiaBetCombination } from './asia.patch';
 
 const props = defineProps<{
   orderId: string;
 }>();
 
 const loading = ref(false);
-const orderInfo = ref(null);
+const orderInfo = ref<any>(null);
 const groupedDetails = ref([]);
 
 // 详情表格列定义
-const detailColumns = [
+const detailColumns: any[] = [
   {
     title: '比赛',
     dataIndex: 'match',
@@ -172,7 +188,7 @@ const detailColumns = [
 ];
 
 // 组合分析表格列定义
-const combinationColumns = [
+const combinationColumns: any[] = [
   {
     title: '已完成比赛',
     dataIndex: 'finishedMatches',
@@ -263,7 +279,7 @@ const combinationDetails = computed(() => {
   if (!groupedDetails.value.length || !orderInfo.value) return [];
 
   const passTypes = orderInfo.value.pass_type.split('').map(Number);
-  const combinations = [];
+  const combinations: any[] = [];
 
   // 对每个过关方式进行处理
   passTypes.forEach(passCount => {
@@ -273,9 +289,9 @@ const combinationDetails = computed(() => {
       const selectedMatches = combination.map(idx => groupedDetails.value[idx]);
       const optionCombinations = getOptionCombinations(selectedMatches);
 
-      optionCombinations.forEach(optionComb => {
-        const finishedMatches = [];
-        const unfinishedMatches = [];
+      optionCombinations.forEach((optionComb: any) => {
+        const finishedMatches: any[] = [];
+        const unfinishedMatches: any[] = [];
         let totalOdds = 1;
         let hasDan = false;
 
@@ -306,12 +322,14 @@ const combinationDetails = computed(() => {
         if(finishedMatches.length === 0){
             totalOdds = 0;
         }
+        // 开始处理补单方案
+        const suggestion = getAsiaBetCombination(finishedMatches.map(match => match.option), finishedMatches[0].handicap);
         combinations.push({
           finishedMatches,
           unfinishedMatches,
           totalOdds,
           hasDan,
-          suggestion: '',
+          suggestion,
         });
       });
     });
@@ -321,17 +339,17 @@ const combinationDetails = computed(() => {
 });
 
 // 辅助函数：获取投注选项的所有组合
-function getOptionCombinations(matches) {
-  const combinations = [];
+function getOptionCombinations(matches: any[]) {
+  const combinations: any[] = [];
   
-  function combine(index, current) {
+  function combine(index: number, current: any[]) {
     if (index === matches.length) {
       combinations.push([...current]);
       return;
     }
 
     const match = matches[index];
-    match.details.forEach(detail => {
+    match.details.forEach((detail: any) => {
       combine(index + 1, [...current, { match, detail }]);
     });
   }
