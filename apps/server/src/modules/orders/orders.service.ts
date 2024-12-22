@@ -12,6 +12,9 @@ import { USER_PROMPTS } from '../tools/llm'
 import { Pagination } from '@server/helper/paginate/pagination';
 import { paginate } from '@server/helper/paginate'
 import { OrderListQueryDto } from './dto/order-list-query.dto';
+import { AsianBet, getAsiaBetCombination as getAsiaPatch } from './tool/asia.patch';
+import { MatchInfo, CombinationResult } from './interfaces/combination.interface';
+import { generateUUID } from '@server/utils';
 
 @Injectable()
 export class OrdersService {
@@ -226,7 +229,7 @@ export class OrdersService {
     // 1. 获取所有未检查价值状态的订单
     const orders = await this.footballOrderRepo.find({
       where: whereCondition,
-      relations: ['details']
+      relations: ['details', 'details.match']
     });
 
     if (!orders.length) {
@@ -261,7 +264,7 @@ export class OrdersService {
           };
         }).sort((a, b) => new Date(a.match.match_date).getTime() - new Date(b.match.match_date).getTime());
 
-        // 获取订单的过关方式
+        // 获取订单过关方式
         const passTypes = order.pass_type.split('').map(Number);
         
         // 检查订单状态
@@ -287,7 +290,7 @@ export class OrdersService {
               const selectedMatches = combination.map(idx => orderMatches[idx]);
               const finishedInCombo = selectedMatches.filter(m => m.isFinished);
               const unfinishedInCombo = selectedMatches.filter(m => !m.isFinished);
-              // 如果已结束的比赛都赢了，且还有未结束的比赛，那么这个组合有价值
+              // 如果已结束的比赛都赢，且还有未结束的比赛，那么这个组合有价值
               if (finishedInCombo.every(m => m.hasWin) && unfinishedInCombo.length > 0) {
                 hasValue = true;
                 break;
@@ -300,6 +303,12 @@ export class OrdersService {
           newStatus = hasValue ? OrderValueStatus.VALUE : OrderValueStatus.NO_VALUE;
         }
 
+        if (newStatus === OrderValueStatus.VALUE) {
+          // 计算补单方案
+          const suggestion = this.getAsiaBetCombinations(order);
+          this.logger.debug(`订单 ${order.id} 有价值，计算补单方案: ${JSON.stringify(suggestion.filter(s => s.suggestion.length > 0))}`);
+        }
+
         // 更新订单状态
         await this.footballOrderRepo.update(order.id, {
           value_status: newStatus
@@ -309,6 +318,120 @@ export class OrdersService {
         this.logger.error(`更新订单 ${order.id} 价值状态失败:`, error);
       }
     }
+  }
+
+  /**
+   * 工具方法，计算亚盘的补单方案
+   * @param orderInfo 订单信息
+   * @returns AsianBet[]
+   */
+  private getAsiaBetCombinations(orderInfo: FootballOrder): CombinationResult[] {
+    const combinations: CombinationResult[] = [];
+    if (!orderInfo.details?.length) return combinations;
+
+    // 1. 按比赛ID分组订单详情
+    const matchDetails = orderInfo.details.reduce((acc, detail) => {
+      if (!acc[detail.match_id]) {
+        acc[detail.match_id] = {
+          match: detail.match,
+          details: [],
+        };
+      }
+      acc[detail.match_id].details.push(detail);
+      return acc;
+    }, {} as Record<string, { match: Match; details: FootballOrderDetail[] }>);
+
+    // 2. 转换为数组并按时间排序
+    const sortedMatches = Object.values(matchDetails).sort((a, b) => 
+      new Date(`${a.match.match_date} ${a.match.match_time}`).getTime() - 
+      new Date(`${b.match.match_date} ${b.match.match_time}`).getTime()
+    );
+
+    // 3. 获取过关方式
+    const passTypes = orderInfo.pass_type.split('').map(Number);
+
+    // 4. 对每个过关方式进行处理
+    passTypes.forEach(passCount => {
+      const matchCombinations = this.getCombinations(sortedMatches.length, passCount);
+
+      matchCombinations.forEach(combination => {
+        const selectedMatches = combination.map(idx => sortedMatches[idx]);
+        const optionCombinations = this.getOptionCombinations(selectedMatches);
+
+        optionCombinations.forEach(optionComb => {
+          const finishedMatches: MatchInfo[] = [];
+          const unfinishedMatches: MatchInfo[] = [];
+          let totalOdds = 1;
+          let hasDan = false;
+
+          optionComb.forEach(({ match, detail }) => {
+            const matchInfo: MatchInfo = {
+              id: match.match_id,
+              teamInfo: `${match.match?.home_team} VS ${match.match?.away_team}`,
+              option: detail.betting_option_code,
+              odds: detail.odds,
+              // isDan: detail.is_dan,
+              result: detail.result,
+            };
+
+            // if (matchInfo.isDan) hasDan = true;
+
+            if (match.match?.whole_score) {
+              finishedMatches.push(matchInfo);
+              if (detail.result === BetResult.WIN) {
+                totalOdds *= detail.odds;
+              } else if (detail.result === BetResult.LOSE) {
+                totalOdds = 0;
+              }
+            } else {
+              unfinishedMatches.push(matchInfo);
+            }
+          });
+
+          // 如果没有已完成的比赛，总赔率为0
+          if (finishedMatches.length === 0) {
+            totalOdds = 0;
+          }
+
+          // 计算补单方案
+          // 目前只支持单场补单
+          const suggestion = finishedMatches.length > 0 && 
+                           totalOdds > 0 && 
+                           unfinishedMatches.length === 1
+            ? getAsiaPatch(unfinishedMatches.map(match => match.option))
+            : [];
+
+          combinations.push({
+            finishedMatches,
+            unfinishedMatches,
+            totalOdds,
+            hasDan,
+            suggestion,
+          });
+        });
+      });
+    });
+
+    return combinations;
+  }
+
+  private getOptionCombinations(matches: { match: any; details: FootballOrderDetail[] }[]) {
+    const combinations: { match: any; detail: FootballOrderDetail }[][] = [];
+    
+    function combine(index: number, current: { match: any; detail: FootballOrderDetail }[]) {
+      if (index === matches.length) {
+        combinations.push([...current]);
+        return;
+      }
+
+      const match = matches[index];
+      match.details.forEach(detail => {
+        combine(index + 1, [...current, { match, detail }]);
+      });
+    }
+
+    combine(0, []);
+    return combinations;
   }
 
   // 辅助方法：获取组合
@@ -427,17 +550,18 @@ export class OrdersService {
   /**
    * 获取订单详情
    */
-  async getOrderDetail(orderId: string) {
+  async getOrderDetailAdmin(orderId: string) {
     // 获取主订单
     const order = await this.footballOrderRepo.findOne({
-      where: { id: orderId }
+      where: { id: orderId },
+      relations: ['details', 'details.match']
     });
 
     if (!order) {
       throw new NotFoundException('订单不存在');
     }
 
-    // 获取订单详情
+    // 这部分代码可能是多余的，因为我们已经在上面关联了match
     const details = await this.footballOrderDetailRepo.find({
       where: { order_id: orderId },
       relations: [
@@ -445,30 +569,31 @@ export class OrdersService {
       ]
     });
 
-    // 获取相关的比赛信息
+    // 这部分也是多余的，因为order.details已经包含了match信息
     const matchIds = details.map(detail => detail.match_id);
     const matches = await this.matchRepo.findBy({ match_id: In(matchIds) });
 
-    // 组装详情数据
-    const detailsWithMatch = details.map(detail => {
-      const match = matches.find(m => m.match_id === detail.match_id);
-      return {
-        ...detail,
-        match: match ? {
-          home_team: match.home_team,
-          away_team: match.away_team,
-          match_time: match.match_time,
-          match_date: match.match_date,
-          whole_score: match.whole_score,
-          half_score: match.half_score,
-          goal_line: match.goal_line,
-        } : null
-      };
-    });
+    // 应该直接使用order.details
+    const detailsWithMatch = order.details.map(detail => ({
+      ...detail,
+      match: detail.match ? {
+        home_team: detail.match.home_team,
+        away_team: detail.match.away_team,
+        match_time: detail.match.match_time,
+        match_date: detail.match.match_date,
+        whole_score: detail.match.whole_score,
+        half_score: detail.match.half_score,
+        goal_line: detail.match.goal_line,
+      } : null
+    }));
+
+    // 计算补单方案
+    const combinations = this.getAsiaBetCombinations(order);
 
     return {
       order,
-      details: detailsWithMatch
+      details: detailsWithMatch,
+      combinations: combinations.map(c => ({id: generateUUID(), ...c})),
     };
   }
 }

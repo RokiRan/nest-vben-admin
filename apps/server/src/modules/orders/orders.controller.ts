@@ -27,7 +27,7 @@ export class OrdersController {
   @Get(':id')
   @ApiOperation({ summary: '获取订单详情' })
   async getOrderDetail(@Param('id') id: string) {
-    return this.ordersService.getOrderDetail(id);
+    return this.ordersService.getOrderDetailAdmin(id);
   }
 
   @Post('ocr')

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Query } from '@nestjs/common';
+import { Controller, Get, Post, Query, Body, Put } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiQuery } from '@nestjs/swagger';
 import { FootballService } from './football.service';
 import { UpdateMatchResultsDto } from './dto/update-match-results.dto';
@@ -10,6 +10,7 @@ import { IsOptional, IsNumber, IsEnum, IsString } from 'class-validator';
 import { MatchStatus } from './entities/match.entity';
 import { MatchListQueryDto } from './dto/match-list-query.dto';
 import { Pagination } from '@server/helper/paginate/pagination';
+import { UpdateMatchScoreDto } from './dto/update-match-score.dto';
 
 
 @ApiTags('Football')
@@ -68,5 +69,18 @@ export class FootballController {
   @ApiResult({ type: [Match], isPage: true })
   async getMatchList(@Query() query: MatchListQueryDto): Promise<Pagination<Match>> {
     return this.footballService.findMatchList(query);
+  }
+
+  @Put('match/score')
+  @ApiOperation({ summary: '修改比赛比分' })
+  async updateMatchScore(@Body() dto: UpdateMatchScoreDto) {
+    return this.footballService.updateMatchScore(dto);
+  }
+
+  @Get('qt/odds')
+  @ApiOperation({ summary: '获取球探网赔率数据' })
+  @ApiQuery({ name: 'qtMatchId', description: '球探网比赛ID', required: true })
+  async getQtOdds(@Query('qtMatchId') qtMatchId: string) {
+    return this.footballService.fetchAndSaveQtOdds(qtMatchId);
   }
 }

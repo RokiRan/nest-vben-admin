@@ -4,14 +4,14 @@
       <template v-if="orderInfo">
         <!-- 订单基本信息 -->
         <Descriptions :column="2" bordered>
-          <Descriptions.Item label="订单编号">{{ orderInfo?.id }}</Descriptions.Item>
-          <Descriptions.Item label="用户ID">{{ orderInfo?.user_id }}</Descriptions.Item>
-          <Descriptions.Item label="投注金额">￥{{ orderInfo?.total_amount }}</Descriptions.Item>
-          <Descriptions.Item label="倍数">{{ orderInfo?.multiple }}</Descriptions.Item>
-          <Descriptions.Item label="过关方式">{{ orderInfo?.pass_type }}</Descriptions.Item>
-          <Descriptions.Item label="玩法">{{ orderInfo?.play_type }}</Descriptions.Item>
-          <Descriptions.Item label="注数">{{ orderInfo?.strip }}</Descriptions.Item>
-          <Descriptions.Item label="预计奖金">￥{{ orderInfo?.plan_bonus }}</Descriptions.Item>
+          <Descriptions.Item label="订单编号">{{ orderInfo?.order.id }}</Descriptions.Item>
+          <Descriptions.Item label="用户ID">{{ orderInfo?.order.user_id }}</Descriptions.Item>
+          <Descriptions.Item label="投注金额">￥{{ orderInfo?.order.total_amount }}</Descriptions.Item>
+          <Descriptions.Item label="倍数">{{ orderInfo?.order.multiple }}</Descriptions.Item>
+          <Descriptions.Item label="过关方式">{{ orderInfo?.order.pass_type }}</Descriptions.Item>
+          <Descriptions.Item label="玩法">{{ orderInfo?.order.play_type }}</Descriptions.Item>
+          <Descriptions.Item label="注数">{{ orderInfo?.order.strip }}</Descriptions.Item>
+          <Descriptions.Item label="预计奖金">￥{{ orderInfo?.order.plan_bonus }}</Descriptions.Item>
         </Descriptions>
 
         <Divider />
@@ -80,7 +80,9 @@
                   :columns="combinationColumns" 
                   :dataSource="combinationDetails" 
                   :pagination="false"
-                  :scroll="{ y: 'calc(100vh - 450px)' }"
+                  :row-key="record => record.id"
+                  :show-expand-column="false"
+                  :expand-row-by-click="true"
                   bordered
                 >
                   <template #bodyCell="{ column, record }">
@@ -112,21 +114,51 @@
                         </span>
                       </div>
                     </template>
+                  </template>
 
-                    <!-- 建议补单方案列 -->
-                    <template v-if="column.dataIndex === 'suggestion'">
-                      <div>
-                        <div v-for="(item, index) in record.suggestion" :key="index">
-                          <div v-for="(option, optIndex) in item" :key="optIndex">
-                            <div v-for="(option2, optIndex2) in option" :key="optIndex2">
-                              <span>{{ option2.type }}</span>
-                              <a-input v-model="option2.bet_odds" />
-                              <a-input v-model="option2.bet_amount" />
+                  <!-- 展开行内容 -->
+                  <template #expandedRowRender="{ record }">
+                    <div class="bg-gray-50 dark:bg-dark-900">
+                      <div class="text-gray-600 dark:text-gray-400 text-13px" v-if="record.suggestion.length === 0 && record.totalOdds > 0">
+                        暂不支持多场补单
+                      </div>
+                      <div v-for="(item, index) in record.suggestion" :key="index" 
+                        class="mb-4 p-4 last:mb-0 bg-white dark:bg-dark-800">
+                        <!-- <div class="mb-3">
+                          <Tag color="processing">方案 {{ index + 1 }}</Tag>
+                        </div> -->
+                        <div v-for="(option, optIndex) in item" :key="optIndex" class="flex flex-col">
+                          <div v-for="(option2, optIndex2) in option" :key="optIndex2" 
+                            class="mb-3 last:mb-0 p-4 bg-gray-50 dark:bg-dark-700 rounded-lg border border-gray-100 dark:border-dark-600">
+                            <Tag class="mb-2" color="blue">{{ option2.handicap }} {{ option2.bet_option === '-' ? '：胜平负' : option2.bet_option }}</Tag>
+                            <div class="flex items-center space-x-8">
+                              <div class="flex items-center">
+                                <span class="w-20 text-gray-600 dark:text-gray-400 text-13px">赔率:</span>
+                                <InputNumber 
+                                  v-model:value="option2.bet_odds" 
+                                  :min="0"
+                                  :step="0.01"
+                                  :precision="2"
+                                  size="small"
+                                  class="w-[100px]"
+                                />
+                              </div>
+                              <div class="flex items-center">
+                                <span class="w-20 text-gray-600 dark:text-gray-400 text-13px">补单金额:</span>
+                                <InputNumber 
+                                  v-model:value="option2.bet_amount" 
+                                  :min="0"
+                                  :step="1"
+                                  :precision="0"
+                                  size="small"
+                                  class="w-[100px]"
+                                />
+                              </div>
                             </div>
                           </div>
                         </div>
                       </div>
-                    </template>
+                    </div>
                   </template>
                 </Table>
               </div>
@@ -140,10 +172,9 @@
 
 <script lang="ts" setup>
 import { ref, watch, computed } from 'vue';
-import { Descriptions, Table, Tag, Divider, Space, Spin, Row, Col } from 'ant-design-vue';
+import { Descriptions, Table, Tag, Divider, Space, Spin, Row, Col, InputNumber } from 'ant-design-vue';
 import { getOrderDetail } from '/@/api/biz/orders';
 import { formatToDateTime } from '/@/utils/dateUtil';
-import { getAsiaBetCombination } from './asia.patch';
 
 const props = defineProps<{
   orderId: string;
@@ -187,17 +218,18 @@ const detailColumns: any[] = [
   },
 ];
 
+
 // 组合分析表格列定义
 const combinationColumns: any[] = [
   {
     title: '已完成比赛',
     dataIndex: 'finishedMatches',
-    width: '20%',
+    width: '30%',
   },
   {
     title: '累计赔率',
     dataIndex: 'totalOdds',
-    width: '10%',
+    width: '20%',
     align: 'center',
     filters: [
       { text: '非零赔率', value: 'nonZero' },
@@ -214,12 +246,7 @@ const combinationColumns: any[] = [
   {
     title: '未完成比赛',
     dataIndex: 'unfinishedMatches',
-    width: '20%',
-  },
-  {
-    title: '建议补单方案',
-    dataIndex: 'suggestion',
-    width: '15%',
+    width: '30%',
   },
 ];
 
@@ -231,7 +258,7 @@ watch(
     loading.value = true;
     try {
       const res = await getOrderDetail(id);
-      orderInfo.value = res.order;
+      orderInfo.value = res;  // 存储整个响应
       
       // 按比赛ID分组处理详情数据
       const groupedByMatch = res.details.reduce((acc, detail) => {
@@ -276,108 +303,9 @@ const getBetResultText = (detail) => {
 
 // 计算组合详情数据
 const combinationDetails = computed(() => {
-  if (!groupedDetails.value.length || !orderInfo.value) return [];
-
-  const passTypes = orderInfo.value.pass_type.split('').map(Number);
-  const combinations: any[] = [];
-
-  // 对每个过关方式进行处理
-  passTypes.forEach(passCount => {
-    const matchCombinations = getCombinations(groupedDetails.value.length, passCount);
-
-    matchCombinations.forEach(combination => {
-      const selectedMatches = combination.map(idx => groupedDetails.value[idx]);
-      const optionCombinations = getOptionCombinations(selectedMatches);
-
-      optionCombinations.forEach((optionComb: any) => {
-        const finishedMatches: any[] = [];
-        const unfinishedMatches: any[] = [];
-        let totalOdds = 1;
-        let hasDan = false;
-
-        optionComb.forEach(({ match, detail }) => {
-          const matchInfo = {
-            id: match.match_id,
-            teamInfo: `${match.match?.home_team} VS ${match.match?.away_team}`,
-            option: detail.betting_option_code,
-            odds: detail.odds,
-            isDan: detail.is_dan,
-            result: detail.result, // 添加结果字段
-          };
-
-          if (matchInfo.isDan) hasDan = true;
-
-          if (match.match?.whole_score) {
-            finishedMatches.push(matchInfo);
-            // 只有中奖的比赛才计入累计赔率
-            if (!matchInfo.isDan && detail.result === 'win') {
-              totalOdds *= detail.odds;
-            } else if (detail.result === 'lose') {
-              totalOdds = 0; // 如果有一场比赛输了，总赔率为0
-            }
-          } else {
-            unfinishedMatches.push(matchInfo);
-          }
-        });
-        if(finishedMatches.length === 0){
-            totalOdds = 0;
-        }
-        // 开始处理补单方案
-        const suggestion = getAsiaBetCombination(finishedMatches.map(match => match.option), finishedMatches[0].handicap);
-        combinations.push({
-          finishedMatches,
-          unfinishedMatches,
-          totalOdds,
-          hasDan,
-          suggestion,
-        });
-      });
-    });
-  });
-
-  return combinations;
+  if (!orderInfo.value?.combinations) return [];
+  return orderInfo.value.combinations;
 });
-
-// 辅助函数：获取投注选项的所有组合
-function getOptionCombinations(matches: any[]) {
-  const combinations: any[] = [];
-  
-  function combine(index: number, current: any[]) {
-    if (index === matches.length) {
-      combinations.push([...current]);
-      return;
-    }
-
-    const match = matches[index];
-    match.details.forEach((detail: any) => {
-      combine(index + 1, [...current, { match, detail }]);
-    });
-  }
-
-  combine(0, []);
-  return combinations;
-}
-
-// 辅助函数：获取组合
-function getCombinations(n: number, r: number): number[][] {
-  const result: number[][] = [];
-  
-  function combine(arr: number[], m: number, start: number = 0, current: number[] = []) {
-    if (current.length === m) {
-      result.push([...current]);
-      return;
-    }
-    
-    for (let i = start; i < n; i++) {
-      current.push(i);
-      combine(arr, m, i + 1, current);
-      current.pop();
-    }
-  }
-  
-  combine([...Array(n).keys()], r);
-  return result;
-}
 </script>
 
 <style lang="less" scoped>
@@ -442,5 +370,52 @@ function getCombinations(n: number, r: number): number[][] {
 :deep(.ant-table-body) {
   overflow-y: auto !important;
   max-height: calc(100vh - 450px) !important;
+}
+
+.patch-plan {
+  background: #fafafa;
+  border-radius: 4px;
+  padding: 8px;
+  margin-bottom: 8px;
+
+  .patch-plan-header {
+    margin-bottom: 8px;
+  }
+
+  .patch-option {
+    background: #fff;
+    border: 1px solid #f0f0f0;
+    border-radius: 4px;
+    padding: 8px;
+    margin-bottom: 8px;
+
+    .patch-option-header {
+      margin-bottom: 8px;
+    }
+
+    .patch-option-content {
+      padding: 0 8px;
+
+      .patch-option-item {
+        display: flex;
+        align-items: center;
+        margin-bottom: 8px;
+
+        .label {
+          width: 70px;
+          color: #666;
+          font-size: 13px;
+        }
+
+        &:last-child {
+          margin-bottom: 0;
+        }
+      }
+    }
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
 }
 </style> 

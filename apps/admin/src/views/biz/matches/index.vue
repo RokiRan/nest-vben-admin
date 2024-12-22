@@ -1,6 +1,6 @@
 <template>
   <PageWrapper dense contentFullHeight fixedHeight contentClass="flex">
-    <BasicTable @register="registerTable">
+    <BasicTable @register="registerTable" @edit-change="onEditChange">
       <template #bodyCell="{ column, record }">
         <template v-if="column.dataIndex === 'match_status'">
           <Tag :color="getMatchStatusColor(record.match_status)">
@@ -20,9 +20,9 @@
 <script lang="ts" setup name="比赛管理">
 import { BasicTable, useTable } from '/@/components/Table';
 import { PageWrapper } from '/@/components/Page';
-import { getMatches } from '/@/api/biz/matches';
+import { getMatches, updateMatchScore } from '/@/api/biz/matches';
 import { columns, searchFormSchema } from './match.data';
-import { Tag } from 'ant-design-vue';
+import { Tag, message } from 'ant-design-vue';
 import { MatchStatus } from '/@/enums/matchEnum';
 
 // 比赛状态颜色映射
@@ -34,9 +34,9 @@ const matchStatusColorMap = {
   [MatchStatus.Rematch]: 'default',
 };
 
-// 比赛状��文本映射
+// 比赛状态文本映射
 const matchStatusTextMap = {
-  [MatchStatus.Selling]: '销售中',
+  [MatchStatus.Selling]: '赛前',
   [MatchStatus.Done]: '已结束',
   [MatchStatus.Delay]: '延期',
   [MatchStatus.Abort]: '腰斩',
@@ -71,4 +71,27 @@ const [registerTable] = useTable({
     y: window.innerHeight - 350,
   },
 });
+
+// 编辑完成回调
+async function onEditChange({ column, record, value }) {
+    if (column.dataIndex === 'whole_score' || column.dataIndex === 'half_score') {
+      if (!record.whole_score ||  !record.half_score) {
+        return;
+      }
+      const scorePattern = /^\d+:\d+$/;
+      if (!scorePattern.test(record.whole_score) || !scorePattern.test(record.half_score)) {
+        return;
+      }
+      try {
+        await updateMatchScore({
+          matchId: record.match_id,
+          wholeScore: record.whole_score,
+          halfScore: record.half_score,
+        });
+        message.success('更新成功');
+      } catch (error) {
+        message.error('更新失败');
+      }
+    }
+  }
 </script>

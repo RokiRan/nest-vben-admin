@@ -7,7 +7,7 @@ export const getAsiaBetCombination = (options: string[], _handicap: string = '')
     const betOptionsType = _getBetOptionsType(options)
     const allowedTypes = ['win_lose_draw', 'handicap_win_lose_draw']
     // 目前只支持胜平负和让球胜平负
-    if (!allowedTypes.includes(betOptionsType)) {
+    if (!allowedTypes.includes(betOptionsType as string)) {
         return []
     }
     const betCombination: Array<Array<AsianBet>> = options.map(option => {
@@ -15,6 +15,8 @@ export const getAsiaBetCombination = (options: string[], _handicap: string = '')
             case 'win_lose_draw':
                 return asianPlan[option]
             case 'handicap_win_lose_draw':
+                // 让球胜平负，得把让球数和选项组合起来
+                
                 return asianPlan[option]
             default:
                 return []
@@ -54,10 +56,12 @@ enum AsianBetType {
     让球 = 'handicap',
     胜平负 = 'win_lose_draw',
 }
-interface AsianBet {
-    handicap: string;
+export interface AsianBet {
+    handicap: string; // 让球/盘口
     type: AsianBetType;
     bet_option: string;
+    bet_odds: number; // 赔率
+    bet_amount: number; // 金额
 }
 type AsianBetItem = '胜' | '平' | '负' | '让胜-*' | '让平-*' | '让负-*'
 const asianPlan: Record<AsianBetItem, Array<Array<AsianBet>>> = {
@@ -67,20 +71,26 @@ const asianPlan: Record<AsianBetItem, Array<Array<AsianBet>>> = {
                 handicap: "-0.5",
                 type: AsianBetType.让球,
                 bet_option: "下盘",
+                bet_odds: 0,
+                bet_amount: 0
             }
         ],
-        [
-            {
-                handicap: "平", 
-                type: AsianBetType.胜平负,
-                bet_option: "-",
-            },
-            {
-                handicap: "负",
-                type: AsianBetType.胜平负,
-                bet_option: "-",
-            }
-        ]
+        // [
+        //     {
+        //         handicap: "平",
+        //         type: AsianBetType.胜平负,
+        //         bet_option: "-",
+        //         bet_odds: 0,
+        //         bet_amount: 0
+        //     },
+        //     {
+        //         handicap: "负",
+        //         type: AsianBetType.胜平负,
+        //         bet_option: "-",
+        //         bet_odds: 0,
+        //         bet_amount: 0
+        //     }
+        // ]
     ],
     '平': [
         [
@@ -88,11 +98,15 @@ const asianPlan: Record<AsianBetItem, Array<Array<AsianBet>>> = {
                 handicap: "胜",
                 type: AsianBetType.让球,
                 bet_option: "-",
+                bet_odds: 0,
+                bet_amount: 0
             },
             {
                 handicap: "负",
                 type: AsianBetType.让球,
                 bet_option: "-",
+                bet_odds: 0,
+                bet_amount: 0
             }
         ]
     ],
@@ -102,20 +116,26 @@ const asianPlan: Record<AsianBetItem, Array<Array<AsianBet>>> = {
                 handicap: "-0.5",
                 type: AsianBetType.胜平负,
                 bet_option: "上盘",
+                bet_odds: 0,
+                bet_amount: 0
             }
         ],
-        [
-            {
-                handicap: "平",
-                type: AsianBetType.胜平负,
-                bet_option: "-",
-            },
-            {
-                handicap: "胜",
-                type: AsianBetType.胜平负,
-                bet_option: "-",
-            }
-        ]
+        // [
+        //     {
+        //         handicap: "平",
+        //         type: AsianBetType.胜平负,
+        //         bet_option: "-",
+        //         bet_odds: 0,
+        //         bet_amount: 0
+        //     },
+        //     {
+        //         handicap: "胜",
+        //         type: AsianBetType.胜平负,
+        //         bet_option: "-",
+        //         bet_odds: 0,
+        //         bet_amount: 0
+        //     }
+        // ]
     ],
     '让胜-*': [
         [
@@ -123,20 +143,26 @@ const asianPlan: Record<AsianBetItem, Array<Array<AsianBet>>> = {
                 handicap: "-*.5",
                 type: AsianBetType.让球,
                 bet_option: "下盘",
+                bet_odds: 0,
+                bet_amount: 0
             }
         ],
-        [
-            {
-                handicap: "让平",
-                type: AsianBetType.胜平负,
-                bet_option: "-",
-            },
-            {
-                handicap: "让负",
-                type: AsianBetType.胜平负,
-                bet_option: "-",
-            }
-        ]
+        // [
+        //     {
+        //         handicap: "让平",
+        //         type: AsianBetType.胜平负,
+        //         bet_option: "-",
+        //         bet_odds: 0,
+        //         bet_amount: 0
+        //     },
+        //     {
+        //         handicap: "让负",
+        //         type: AsianBetType.胜平负,
+        //         bet_option: "-",
+        //         bet_odds: 0,
+        //         bet_amount: 0
+        //     }
+        // ]
     ],
     '让平-*': [
         [
@@ -144,11 +170,15 @@ const asianPlan: Record<AsianBetItem, Array<Array<AsianBet>>> = {
                 handicap: "让胜",
                 type: AsianBetType.让球,
                 bet_option: "-",
+                bet_odds: 0,
+                bet_amount: 0
             },
             {
                 handicap: "让负",
                 type: AsianBetType.让球,
                 bet_option: "-",
+                bet_odds: 0,
+                bet_amount: 0
             }
         ]
     ],
@@ -158,19 +188,25 @@ const asianPlan: Record<AsianBetItem, Array<Array<AsianBet>>> = {
                 handicap: "让胜",
                 type: AsianBetType.让球,
                 bet_option: "-",
+                bet_odds: 0,
+                bet_amount: 0
             }
         ],
-        [
-            {
-                handicap: "让平",
-                type: AsianBetType.胜平负,
-                bet_option: "-",
-            },
-            {
-                handicap: "让胜",
-                type: AsianBetType.胜平负,
-                bet_option: "-",
-            }
-        ]
+        // [
+        //     {
+        //         handicap: "让平",
+        //         type: AsianBetType.胜平负,
+        //         bet_option: "-",
+        //         bet_odds: 0,
+        //         bet_amount: 0
+        //     },
+        //     {
+        //         handicap: "让胜",
+        //         type: AsianBetType.胜平负,
+        //         bet_option: "-",
+        //         bet_odds: 0,
+        //         bet_amount: 0
+        //     }
+        // ]
     ],
 }

@@ -42,3 +42,16 @@ export function getLeagues() {
     url: Api.Leagues, 
   });
 }
+
+export interface UpdateScoreParams {
+  matchId: number;
+  wholeScore: string;
+  halfScore: string;
+}
+
+export function updateMatchScore(data: UpdateScoreParams) {
+  return defHttp.put<{ success: boolean }>({
+    url: '/football/match/score',
+    data,
+  });
+}

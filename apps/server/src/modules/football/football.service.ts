@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between } from 'typeorm';
 import { HttpService } from '@nestjs/axios';
@@ -11,6 +11,10 @@ import { UpdateMatchResultsDto } from './dto/update-match-results.dto';
 import { getOddsData } from './tool/odds.formater';
 import { paginate } from '@server/helper/paginate';
 import { MatchListQueryDto } from './dto/match-list-query.dto';
+import { UpdateMatchScoreDto } from './dto/update-match-score.dto';
+import { InjectRedis } from '@liaoliaots/nestjs-redis';
+import Redis from 'ioredis';
+import { QtOddsDetail, QtOddsResponse } from './interfaces/qt-odds.interface';
 
 @Injectable()
 export class FootballService {
@@ -18,6 +22,7 @@ export class FootballService {
   private readonly MATCH_CALCULATOR_API_URL = 'https://webapi.sporttery.cn/gateway/jc/football/getMatchCalculatorV1.qry?poolCode=&channel=c';
   private readonly RESULT_API_URL = 'https://webapi.sporttery.cn/gateway/jc/football/getMatchResultV1.qry';
   private readonly FOOTBALL_API_URL = `https://jc.titan007.com/xml/bf_jc.txt`;
+  private readonly QT_ODDS_API_URL = 'https://m.titan007.com/HandicapDataInterface.ashx';
 
   constructor(
     @InjectRepository(Match)
@@ -25,6 +30,7 @@ export class FootballService {
     @InjectRepository(League)
     private readonly leagueRepository: Repository<League>,
     private readonly httpService: HttpService,
+    @InjectRedis() private readonly redis: Redis,
   ) {}
 
   async fetchAndSaveData() {
@@ -205,6 +211,7 @@ export class FootballService {
           draw_odds: result.d,
           away_odds: result.a,
           goal_line: result.goalLine,
+          sell_status: 2,
           // TODO: 比赛状态
           match_status: MatchStatus.Done
         };
@@ -440,5 +447,72 @@ export class FootballService {
       page,
       pageSize,
     });
+  }
+
+  async updateMatchScore(dto: UpdateMatchScoreDto) {
+    const { matchId, wholeScore, halfScore } = dto;
+
+    // 查找比赛
+    const match = await this.matchRepository.findOne({
+      where: { match_id: matchId },
+    });
+
+    if (!match) {
+      throw new NotFoundException(`比赛ID ${matchId} 不存在`);
+    }
+
+    // 更新比分
+    await this.matchRepository.update(
+      { match_id: matchId },
+      {
+        whole_score: wholeScore,
+        half_score: halfScore,
+        match_status: MatchStatus.Done, // 设置比赛状态为已结束
+        sell_status: 2, // 设置销售状态为已停售
+        match_result_status: '2',
+      },
+    );
+
+    return { success: true };
+  }
+
+  async fetchAndSaveQtOdds(qtMatchId: string) {
+    try {
+      const params = {
+        scheid: qtMatchId,
+        type: 1,
+        oddskind: 0,
+        isHalf: 0,
+        flesh: Date.now(),
+      };
+
+      const { data } = await firstValueFrom(
+        this.httpService.get<QtOddsResponse>(this.QT_ODDS_API_URL, { params })
+      );
+
+      // 找到 companyId 为 3 的数据
+      const crownCompany = data.companies.find(company => company.companyId === 3);
+      
+      if (!crownCompany || !crownCompany.details.length) {
+        this.logger.warn(`未找到 Crown 公司的赔率数据，qtMatchId: ${qtMatchId}`);
+        return null;
+      }
+
+      // 提取需要的字段
+      const oddsDetails: QtOddsDetail[] = crownCompany.details.map(detail => ({
+        homeOdds: detail.homeOdds,
+        drawOdds: detail.drawOdds,
+        awayOdds: detail.awayOdds,
+      }));
+
+      // 存储到 Redis
+      const redisKey = `qt_odd_${qtMatchId}`;
+      await this.redis.set(redisKey, JSON.stringify(oddsDetails), 'EX', 3600); // 设置1小时过期
+
+      return oddsDetails;
+    } catch (error) {
+      this.logger.error(`获取球探网赔率数据失败: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 }

@@ -27,6 +27,7 @@
       @register="registerDrawer"
       showFooter
       :title="'订单详情'"
+      :destroy-on-close="true"
       :is-detail="true"
     >
       <OrderDetail :order-id="currentOrderId" />
