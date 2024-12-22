@@ -7,6 +7,7 @@ export interface MatchInfo {
   odds: number;
   result: string;
   matchTime?: Date;
+  handicap?: string;
 }
 
 export interface CombinationResult {

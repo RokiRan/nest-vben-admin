@@ -15,6 +15,7 @@ import { OrderListQueryDto } from './dto/order-list-query.dto';
 import { AsianBet, getAsiaBetCombination as getAsiaPatch } from './tool/asia.patch';
 import { MatchInfo, CombinationResult } from './interfaces/combination.interface';
 import { generateUUID } from '@server/utils';
+import Decimal from 'decimal.js';
 
 @Injectable()
 export class OrdersService {
@@ -361,7 +362,7 @@ export class OrdersService {
         optionCombinations.forEach(optionComb => {
           const finishedMatches: MatchInfo[] = [];
           const unfinishedMatches: MatchInfo[] = [];
-          let totalOdds = 1;
+          let totalOdds = new Decimal(1); // 使用 Decimal 处理精度
           let hasDan = false;
 
           optionComb.forEach(({ match, detail }) => {
@@ -372,6 +373,7 @@ export class OrdersService {
               odds: detail.odds,
               // isDan: detail.is_dan,
               result: detail.result,
+              handicap: match.match?.goal_line,
             };
 
             // if (matchInfo.isDan) hasDan = true;
@@ -379,9 +381,9 @@ export class OrdersService {
             if (match.match?.whole_score) {
               finishedMatches.push(matchInfo);
               if (detail.result === BetResult.WIN) {
-                totalOdds *= detail.odds;
+                totalOdds = totalOdds.mul(new Decimal(detail.odds)); // 使用 mul 方法相乘
               } else if (detail.result === BetResult.LOSE) {
-                totalOdds = 0;
+                totalOdds = new Decimal(0);
               }
             } else {
               unfinishedMatches.push(matchInfo);
@@ -390,21 +392,22 @@ export class OrdersService {
 
           // 如果没有已完成的比赛，总赔率为0
           if (finishedMatches.length === 0) {
-            totalOdds = 0;
+            totalOdds = new Decimal(0);
           }
 
           // 计算补单方案
           // 目前只支持单场补单
+          const handicap = unfinishedMatches.length > 0 && unfinishedMatches.filter(match => match.handicap)[0]?.handicap || '';
           const suggestion = finishedMatches.length > 0 && 
-                           totalOdds > 0 && 
+                           !totalOdds.isZero() && // 使用 isZero 判断是否为0
                            unfinishedMatches.length === 1
-            ? getAsiaPatch(unfinishedMatches.map(match => match.option))
+            ? getAsiaPatch(unfinishedMatches.map(match => match.option), handicap)
             : [];
 
           combinations.push({
             finishedMatches,
             unfinishedMatches,
-            totalOdds,
+            totalOdds: totalOdds.toNumber(), // 转换回数字
             hasDan,
             suggestion,
           });

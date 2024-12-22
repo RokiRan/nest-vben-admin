@@ -16,8 +16,18 @@ export const getAsiaBetCombination = (options: string[], _handicap: string = '')
                 return asianPlan[option]
             case 'handicap_win_lose_draw':
                 // 让球胜平负，得把让球数和选项组合起来
-                
-                return asianPlan[option]
+                // 获取具体让球数
+                if (!_handicap) {
+                    throw new Error('handicap is required')
+                }
+                const betComb = asianPlan[option+'*']
+                betComb.forEach(item => {
+                    item.forEach(item2 => {
+                        const operator = option === '让胜' ? -1 : 1
+                        item2.handicap =  _handicap[0] + (Math.abs(Number(_handicap)) + 0.5 * operator).toString()
+                    })
+                })
+                return betComb
             default:
                 return []
         }
@@ -63,7 +73,7 @@ export interface AsianBet {
     bet_odds: number; // 赔率
     bet_amount: number; // 金额
 }
-type AsianBetItem = '胜' | '平' | '负' | '让胜-*' | '让平-*' | '让负-*'
+type AsianBetItem = '胜' | '平' | '负' | '让胜*' | '让平*' | '让负*'
 const asianPlan: Record<AsianBetItem, Array<Array<AsianBet>>> = {
     '胜': [
         [
@@ -95,16 +105,16 @@ const asianPlan: Record<AsianBetItem, Array<Array<AsianBet>>> = {
     '平': [
         [
             {
-                handicap: "胜",
+                handicap: "平",
                 type: AsianBetType.让球,
-                bet_option: "-",
+                bet_option: "胜",
                 bet_odds: 0,
                 bet_amount: 0
             },
             {
-                handicap: "负",
+                handicap: "平",
                 type: AsianBetType.让球,
-                bet_option: "-",
+                bet_option: "负",
                 bet_odds: 0,
                 bet_amount: 0
             }
@@ -137,10 +147,10 @@ const asianPlan: Record<AsianBetItem, Array<Array<AsianBet>>> = {
         //     }
         // ]
     ],
-    '让胜-*': [
+    '让胜*': [
         [
             {
-                handicap: "-*.5",
+                handicap: "*.5",
                 type: AsianBetType.让球,
                 bet_option: "下盘",
                 bet_odds: 0,
@@ -164,30 +174,30 @@ const asianPlan: Record<AsianBetItem, Array<Array<AsianBet>>> = {
         //     }
         // ]
     ],
-    '让平-*': [
+    '让平*': [
         [
             {
-                handicap: "让胜",
+                handicap: "*",
                 type: AsianBetType.让球,
-                bet_option: "-",
+                bet_option: "让胜",
                 bet_odds: 0,
                 bet_amount: 0
             },
             {
-                handicap: "让负",
+                handicap: "*",
                 type: AsianBetType.让球,
-                bet_option: "-",
+                bet_option: "让负",
                 bet_odds: 0,
                 bet_amount: 0
             }
         ]
     ],
-    '让负-*': [
+    '让负*': [
         [
             {
-                handicap: "让胜",
+                handicap: "*.5",
                 type: AsianBetType.让球,
-                bet_option: "-",
+                bet_option: "上盘",
                 bet_odds: 0,
                 bet_amount: 0
             }
